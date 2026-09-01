@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ماسح أسعار المنتجات</title>
-    <!-- مكتبة الكاميرا -->
+    <title>كاشير وماسح أسعار المحل</title>
+    <!-- مكتبة الكاميرا ومسح الباركود -->
     <script src="https://unpkg.com/html5-qrcode"></script>
-    <!-- مكتبة قراءة جداول جوجل -->
+    <!-- مكتبة قراءة جداول Google Sheets -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
         * {
@@ -15,101 +15,28 @@
         body {
             font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             text-align: center;
-            background-color: #eef2f5;
+            background-color: #f1f5f9;
             padding: 15px;
             margin: 0;
+            color: #1e293b;
         }
         .container {
-            max-width: 480px;
+            max-width: 500px;
             margin: 0 auto;
         }
         h2 {
-            color: #1e293b;
-            font-size: 26px;
-            margin: 10px 0 15px 0;
+            margin: 5px 0 10px 0;
+            font-size: 24px;
         }
         #status {
             font-weight: 600;
-            margin-bottom: 15px;
-            font-size: 16px;
+            margin-bottom: 12px;
+            font-size: 15px;
             color: #d97706;
         }
-        #camera-wrapper {
-            background: #000;
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-            margin-bottom: 20px;
-        }
-        #reader {
-            width: 100%;
-        }
-        #result-card {
-            background: #ffffff;
-            border-radius: 20px;
-            padding: 30px 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            display: none;
-            animation: popIn 0.3s ease-out;
-        }
-        @keyframes popIn {
-            from { transform: scale(0.95); opacity: 0; }
-            to { transform: scale(1); opacity: 1; }
-        }
-        .product-title {
-            font-size: 28px;
-            font-weight: 800;
-            color: #0f172a;
-            margin-bottom: 10px;
-            line-height: 1.3;
-        }
-        .product-desc {
-            font-size: 18px;
-            color: #64748b;
-            margin-bottom: 20px;
-        }
-        .price-box {
-            background: #f8fafc;
-            border-radius: 16px;
-            padding: 20px;
-            margin: 20px 0;
-            border: 2px solid #e2e8f0;
-        }
-        .price-normal {
-            font-size: 44px;
-            font-weight: 900;
-            color: #16a34a;
-        }
-        .old-price {
-            text-decoration: line-through;
-            color: #94a3b8;
-            font-size: 22px;
-            margin-bottom: 6px;
-            font-weight: 600;
-        }
-        .price-offer {
-            font-size: 48px;
-            font-weight: 900;
-            color: #dc2626;
-        }
-        .offer-tag {
-            display: inline-block;
-            background-color: #fee2e2;
-            color: #dc2626;
-            padding: 6px 16px;
-            border-radius: 50px;
-            font-weight: bold;
-            font-size: 16px;
-            margin-top: 8px;
-        }
-        .error-box {
-            color: #dc2626;
-            font-size: 24px;
-            font-weight: bold;
-            padding: 20px;
-        }
-        /* زر مسح منتج جديد بحجم كبير ومريح */
-        .btn-scan-again {
+        
+        /* زر فتح الكاميرا الرئيسي */
+        .btn-open-cam {
             width: 100%;
             background: #2563eb;
             color: #ffffff;
@@ -117,44 +44,199 @@
             padding: 18px;
             font-size: 22px;
             font-weight: bold;
-            border-radius: 14px;
+            border-radius: 16px;
             cursor: pointer;
-            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
-            margin-top: 15px;
-            transition: background 0.2s;
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
         }
-        .btn-scan-again:active {
-            background: #1d4ed8;
+        .btn-open-cam:active {
             transform: scale(0.98);
+            background: #1d4ed8;
+        }
+
+        #camera-wrapper {
+            background: #000;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            margin-bottom: 15px;
+            display: none;
+        }
+        #reader {
+            width: 100%;
+        }
+
+        .btn-close-cam {
+            background: #ef4444;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 8px;
+            margin: 10px auto;
+            cursor: pointer;
+            display: block;
+        }
+
+        /* كارت آخر منتج تم مسحه */
+        #last-scanned {
+            background: #ffffff;
+            border-radius: 14px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+            display: none;
+            border-right: 6px solid #2563eb;
+            text-align: right;
+        }
+
+        /* كرت الإجمالي */
+        .total-card {
+            background: #0f172a;
+            color: #ffffff;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 10px 25px rgba(15, 23, 42, 0.2);
+        }
+        .total-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #94a3b8;
+        }
+        .total-amount {
+            font-size: 36px;
+            font-weight: 900;
+            color: #22c55e;
+        }
+
+        /* قائمة المنتجات المسجلة في السلة */
+        .cart-section {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+            text-align: right;
+        }
+        .cart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #f1f5f9;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+        }
+        .cart-header h3 {
+            margin: 0;
+            font-size: 18px;
+        }
+        .btn-clear {
+            background: #fee2e2;
+            color: #dc2626;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .cart-items {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            max-height: 280px;
+            overflow-y: auto;
+        }
+        .cart-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #f8fafc;
+        }
+        .item-info {
+            flex-grow: 1;
+        }
+        .item-name {
+            font-weight: 700;
+            font-size: 16px;
+        }
+        .item-sub {
+            font-size: 13px;
+            color: #64748b;
+        }
+        .item-price {
+            font-size: 18px;
+            font-weight: bold;
+            color: #16a34a;
+            text-align: left;
+        }
+        .offer-price {
+            color: #dc2626;
+        }
+        .empty-msg {
+            text-align: center;
+            color: #94a3b8;
+            padding: 20px;
+            font-size: 15px;
         }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h2>📱 ماسح أسعار المنتجات</h2>
-        <div id="status">⏳ جاري الاتصال بالجدول...</div>
+        <h2>🧾 كاشير ومحاسبة المحل</h2>
+        <div id="status">⏳ جاري تحميل البيانات...</div>
 
-        <!-- حاوية الكاميرا -->
+        <!-- زر فتح الكاميرا عند الطلب فقط -->
+        <button id="btn-start" class="btn-open-cam" onclick="openScanner()">
+            <span>📷</span> فتح الكاميرا لمسح كود
+        </button>
+
+        <!-- نافذة الكاميرا -->
         <div id="camera-wrapper">
             <div id="reader"></div>
+            <button class="btn-close-cam" onclick="closeScanner()">❌ إلغاء وإغلاق الكاميرا</button>
         </div>
 
-        <!-- كرت عرض تفاصيل المنتج بعد المسح -->
-        <div id="result-card">
-            <div id="product-content"></div>
-            <button class="btn-scan-again" onclick="restartCamera()">📷 مسح منتج آخر</button>
+        <!-- إشعار آخر منتج تم مسحه -->
+        <div id="last-scanned"></div>
+
+        <!-- شريط المجموع الكلي -->
+        <div class="total-card">
+            <div class="total-title">المجموع الكلي:</div>
+            <div class="total-amount" id="grand-total">0.00 €</div>
+        </div>
+
+        <!-- سجل المنتجات الممسوحة -->
+        <div class="cart-section">
+            <div class="cart-header">
+                <h3>🛒 المنتجات المسجلة (<span id="items-count">0</span>)</h3>
+                <button class="btn-clear" onclick="clearCart()">تصفير الفاتورة</button>
+            </div>
+            <ul class="cart-items" id="cart-list">
+                <li class="empty-msg">لم يتم مسح أي منتج بعد</li>
+            </ul>
         </div>
     </div>
 
     <script>
         let products = [];
+        let cart = [];
         let html5QrCode = null;
         let isCameraRunning = false;
 
         const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQCpR9i8vwj3iwcjDyB3xQjx2iTaD3s1kLjYRbwNQW-IOcrdADwRE4mBGbk96pxKGKLYqfbpjVuDLqI/pub?output=csv";
 
-        // تحميل بيانات المنتجات من جداول جوجل
+        // تحميل البيانات من Google Sheets
         Papa.parse(sheetUrl, {
             download: true,
             header: true,
@@ -163,17 +245,16 @@
                 products = results.data;
                 const statusDiv = document.getElementById('status');
                 if (products.length > 0) {
-                    statusDiv.innerText = `✅ جاهز للعمل (${products.length} منتج مسجل)`;
+                    statusDiv.innerText = `✅ النظام جاهز (${products.length} منتج مسجل)`;
                     statusDiv.style.color = "#16a34a";
-                    startDirectCamera();
                 } else {
-                    statusDiv.innerText = "⚠️ لم يتم العثور على بيانات في الجدول.";
+                    statusDiv.innerText = "⚠️ لم يتم العثور على منتجات في الجدول.";
                     statusDiv.style.color = "#dc2626";
                 }
             },
             error: function() {
                 const statusDiv = document.getElementById('status');
-                statusDiv.innerText = "❌ تعذر قراءة البيانات من جوجل شيت.";
+                statusDiv.innerText = "❌ تعذر قراءة البيانات من جدول جوجل.";
                 statusDiv.style.color = "#dc2626";
             }
         });
@@ -182,7 +263,7 @@
             return val ? String(val).trim() : "";
         }
 
-        // مطابقة الباركود بمرونة
+        // مطابقة الكود
         function findProduct(code) {
             const rawScan = cleanString(code);
             const noZerosScan = rawScan.replace(/^0+/, '');
@@ -194,11 +275,10 @@
             });
         }
 
-        // تشغيل الكاميرا الخلفية مباشرة
-        function startDirectCamera() {
+        // فتح الكاميرا عند طلبك
+        function openScanner() {
             document.getElementById('camera-wrapper').style.display = 'block';
-            document.getElementById('result-card').style.display = 'none';
-            document.getElementById('status').innerText = "📷 وجّه الكاميرا نحو الباركود";
+            document.getElementById('btn-start').style.display = 'none';
 
             if (!html5QrCode) {
                 html5QrCode = new Html5Qrcode("reader");
@@ -215,69 +295,113 @@
                     isCameraRunning = true;
                 })
                 .catch(err => {
-                    console.error(err);
-                    document.getElementById('status').innerText = "⚠️ يرجى السماح بتشغيل الكاميرا في المتصفح";
-                    document.getElementById('status').style.color = "#dc2626";
+                    alert("يرجى إعطاء الإذن للكاميرا بالعمل.");
+                    closeScanner();
                 });
         }
 
-        // إيقاف الكاميرا فوراً بعد المسح
-        function stopCameraAndShowResult(renderHtml) {
+        // إغلاق الكاميرا
+        function closeScanner() {
             if (isCameraRunning && html5QrCode) {
                 html5QrCode.stop().then(() => {
                     isCameraRunning = false;
                     document.getElementById('camera-wrapper').style.display = 'none';
-                    document.getElementById('product-content').innerHTML = renderHtml;
-                    document.getElementById('result-card').style.display = 'block';
-                    document.getElementById('status').innerText = "✨ تم العثور على المنتج بنجاح";
-                }).catch(err => {
-                    console.error("خطأ في إيقاف الكاميرا", err);
-                });
+                    document.getElementById('btn-start').style.display = 'flex';
+                }).catch(err => console.error(err));
+            } else {
+                document.getElementById('camera-wrapper').style.display = 'none';
+                document.getElementById('btn-start').style.display = 'flex';
             }
         }
 
-        // معالجة النتيجة عند قراءة الكود
+        // عند التقاط الكود بنجاح
         function onScanSuccess(decodedText) {
+            // إغلاق الكاميرا فوراً
+            closeScanner();
+
             const product = findProduct(decodedText);
-            let html = "";
+            const lastScannedDiv = document.getElementById('last-scanned');
+            lastScannedDiv.style.display = 'block';
 
             if (product) {
-                const name = cleanString(product.name || product.Produkt || product['الاسم'] || 'منتج غير مسمى');
-                const price = cleanString(product.price || product.Preis || product['السعر'] || '0');
-                const offer = cleanString(product.offer || product.Offer || product['العرض']);
-                const desc = cleanString(product.Beschreibung || product.desc || product['الوصف']);
+                const name = cleanString(product.name || product.Produkt || product['الاسم'] || 'منتج');
+                const rawPrice = cleanString(product.price || product.Preis || product['السعر'] || '0').replace(',', '.');
+                const rawOffer = cleanString(product.offer || product.Offer || product['العرض']).replace(',', '.');
+                const desc = cleanString(product.Beschreibung || product.desc || '');
 
-                html += `<div class="product-title">${name}</div>`;
-                if (desc) {
-                    html += `<div class="product-desc">${desc}</div>`;
-                }
+                const hasOffer = (rawOffer !== "" && !isNaN(parseFloat(rawOffer)));
+                const finalPrice = hasOffer ? parseFloat(rawOffer) : parseFloat(rawPrice);
 
-                html += `<div class="price-box">`;
-                if (offer !== "") {
-                    html += `<div class="old-price">السعر الأصلي: ${price} €</div>`;
-                    html += `<div class="price-offer">${offer} €</div>`;
-                    html += `<div class="offer-tag">🔥 عرض خاص</div>`;
-                } else {
-                    html += `<div class="price-normal">${price} €</div>`;
-                }
-                html += `</div>`;
-            } else {
-                html = `
-                    <div class="error-box">
-                        ❌ المنتج غير مسجل في الجدول
-                        <div style="font-size: 16px; color: #64748b; margin-top: 8px; font-weight: normal;">
-                            (كود المنتج: ${decodedText})
-                        </div>
+                // إضافة المنتج إلى السلة
+                cart.unshift({
+                    name: name,
+                    desc: desc,
+                    price: finalPrice,
+                    isOffer: hasOffer,
+                    originalPrice: parseFloat(rawPrice)
+                });
+
+                // إشعار آخر منتج
+                lastScannedDiv.innerHTML = `
+                    <div style="color: #16a34a; font-weight: bold; font-size: 16px;">✅ تمت الإضافة إلى الفاتورة:</div>
+                    <div style="font-size: 18px; font-weight: 800; color: #0f172a;">${name}</div>
+                    <div style="font-size: 16px; color: ${hasOffer ? '#dc2626' : '#16a34a'}; font-weight: bold;">
+                        السعر: ${finalPrice.toFixed(2)} € ${hasOffer ? '(عرض 🔥)' : ''}
                     </div>
                 `;
-            }
 
-            stopCameraAndShowResult(html);
+                updateCartUI();
+            } else {
+                lastScannedDiv.innerHTML = `
+                    <div style="color: #dc2626; font-weight: bold; font-size: 16px;">❌ المنتج غير موجود بالجدول!</div>
+                    <div style="font-size: 14px; color: #64748b;">(الكود الممسوح: ${decodedText})</div>
+                `;
+            }
         }
 
-        // إعادة تشغيل الكاميرا لمسح منتج جديد
-        function restartCamera() {
-            startDirectCamera();
+        // تحديث واجهة السلة والمجموع
+        function updateCartUI() {
+            const listEl = document.getElementById('cart-list');
+            const totalEl = document.getElementById('grand-total');
+            const countEl = document.getElementById('items-count');
+
+            countEl.innerText = cart.length;
+
+            if (cart.length === 0) {
+                listEl.innerHTML = '<li class="empty-msg">لم يتم مسح أي منتج بعد</li>';
+                totalEl.innerText = '0.00 €';
+                return;
+            }
+
+            let total = 0;
+            let html = '';
+
+            cart.forEach((item, index) => {
+                total += item.price;
+                html += `
+                    <li class="cart-item">
+                        <div class="item-info">
+                            <div class="item-name">${item.name}</div>
+                            <div class="item-sub">${item.desc ? item.desc + ' | ' : ''}${item.isOffer ? '🔥 عرض خاص' : ''}</div>
+                        </div>
+                        <div class="item-price ${item.isOffer ? 'offer-price' : ''}">
+                            ${item.price.toFixed(2)} €
+                        </div>
+                    </li>
+                `;
+            });
+
+            listEl.innerHTML = html;
+            totalEl.innerText = total.toFixed(2) + ' €';
+        }
+
+        // تصفير الفاتورة
+        function clearCart() {
+            if (cart.length > 0 && confirm("هل أنت متأكد من مسح الفاتورة والبدء من جديد؟")) {
+                cart = [];
+                document.getElementById('last-scanned').style.display = 'none';
+                updateCartUI();
+            }
         }
     </script>
 </body>
