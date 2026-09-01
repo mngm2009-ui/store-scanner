@@ -1,0 +1,16 @@
+[
+  {
+    "barcode": "12345",
+    "name": "تيشيرت أسود",
+    "price": 50,
+    "has_offer": false,
+    "offer_price": 0
+  },
+  {
+    "barcode": "67890",
+    "name": "حذاء رياضي",
+    "price": 120,
+    "has_offer": true,
+    "offer_price": 90
+  }
+]
