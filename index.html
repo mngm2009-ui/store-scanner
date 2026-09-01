@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ماسح أسعار المنتجات</title>
+    <!-- مكتبة تشغيل الكاميرا ومسح الباركود -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background-color: #f4f7f6; padding: 20px; }
+        #reader { width: 100%; max-width: 400px; margin: 0 auto; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.1); background: #fff; }
+        #result { margin-top: 20px; max-width: 400px; margin-left: auto; margin-right: auto; padding: 20px; border-radius: 10px; background: #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: none; }
+        h2 { color: #2c3e50; }
+        .product-name { font-size: 22px; color: #2980b9; margin-bottom: 10px; font-weight: bold; }
+        .price { font-size: 20px; color: #27ae60; font-weight: bold; }
+        .old-price { text-decoration: line-through; color: #95a5a6; font-size: 16px; margin-bottom: 5px; }
+        .offer { font-size: 22px; color: #e74c3c; font-weight: bold; }
+        .error { color: #c0392b; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h2>📱 ماسح أسعار المحل</h2>
+    
+    <!-- المكان الذي ستظهر فيه الكاميرا -->
+    <div id="reader"></div>
+    
+    <!-- المكان الذي ستظهر فيه نتيجة الفحص -->
+    <div id="result"></div>
+
+    <script>
+        let products = [];
+
+        // 1. جلب بيانات المنتجات من ملف JSON الذي صنعناه
+        fetch('products.json')
+            .then(response => response.json())
+            .then(data => {
+                products = data;
+            })
+            .catch(error => console.error("خطأ في تحميل المنتجات:", error));
+
+        // 2. وظيفة تعمل عند التقاط كود بنجاح
+        function onScanSuccess(decodedText, decodedResult) {
+            const resultDiv = document.getElementById('result');
+            
+            // البحث عن الباركود داخل المنتجات
+            const product = products.find(p => p.barcode === decodedText);
+
+            resultDiv.style.display = 'block';
+
+            if (product) {
+                let html = `<div class="product-name">${product.name}</div>`;
+                
+                if (product.has_offer) {
+                    html += `<div class="old-price">السعر الأصلي: ${product.price}</div>`;
+                    html += `<div class="offer">سعر العرض: ${product.offer_price} 🔥</div>`;
+                } else {
+                    html += `<div class="price">السعر: ${product.price}</div>`;
+                }
+                
+                resultDiv.innerHTML = html;
+            } else {
+                resultDiv.innerHTML = `<div class="error">المنتج غير موجود في النظام (كود: ${decodedText})</div>`;
+            }
+        }
+
+        // 3. تشغيل الكاميرا
+        let html5QrcodeScanner = new Html5QrcodeScanner(
+            "reader", 
+            { fps: 10, qrbox: {width: 250, height: 250} }, 
+            /* verbose= */ false
+        );
+        html5QrcodeScanner.render(onScanSuccess);
+    </script>
+</body>
+</html>
