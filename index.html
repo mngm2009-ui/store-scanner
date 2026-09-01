@@ -168,11 +168,11 @@
             <span>📷</span> فتح الكاميرا لمسح كود
         </button>
 
-        <!-- نافذة رفع الملفات -->
+        <!-- نافذة رفع وتحديث المنتجات -->
         <div class="upload-card">
-            <label class="upload-label" for="file-input">📂 رفع ملف منتجات جديد (CSV)</label>
+            <label class="upload-label" for="file-input">📂 رفع / تحديث أسعار ملف (CSV)</label>
             <input type="file" id="file-input" accept=".csv" style="display: none;" onchange="handleFileUpload(event)">
-            <div id="upload-status">يمكنك رفع ملف المنتجات (CSV) مباشرة لحفظه بجوجل</div>
+            <div id="upload-status">رفع ملف جديد سيحدّث الأسعار القديمة ويضيف الجديد تلقائياً</div>
         </div>
 
         <div id="camera-wrapper">
@@ -210,17 +210,13 @@
         let isCameraRunning = false;
         const beepAudio = document.getElementById('beep-sound');
 
-        // رابط قراءة البيانات من Google Sheets
         const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQCpR9i8vwj3iwcjDyB3xQjx2iTaD3s1kLjYRbwNQW-IOcrdADwRE4mBGbk96pxKGKLYqfbpjVuDLqI/pub?output=csv";
-        
-        // رابط الـ Web App الخاص بك لإرسال الملفات تلقائياً
         const webAppUrl = "https://script.google.com/macros/s/AKfycbxkrlCtQUsFsSYWHGLSqQzo1JizU0q6flEYiGjw1UnuMg4oHU1SVUfUv2PAzFGaKZUD/exec";
 
         function cleanString(val) {
             return val ? String(val).trim() : "";
         }
 
-        // دالة ذكية لاستخراج الحقول بغض النظر عن أسماء الأعمدة (ألماني/إنجليزي/عربي)
         function extractProductFields(item) {
             const barcode = cleanString(item.Barcode || item.barcode || item['بار كود'] || item['كود'] || item['BARCODE']);
             const name = cleanString(item.Produkt || item.produkt || item.name || item.Name || item['الاسم'] || item['اسم المنتج']);
@@ -231,17 +227,23 @@
             return { barcode, name, price, offer, desc };
         }
 
-        // تحميل البيانات من Google Sheets
+        // تحميل أحدث المنتجات من Google Sheets
         function loadProductsFromGoogle() {
             Papa.parse(sheetUrl, {
                 download: true,
                 header: true,
                 skipEmptyLines: true,
                 complete: function(results) {
-                    products = results.data.map(extractProductFields).filter(p => p.barcode !== "");
+                    const rawList = results.data.map(extractProductFields).filter(p => p.barcode !== "");
+                    
+                    // إزالة التكرار مع اعتماد آخر سجل
+                    const uniqueMap = new Map();
+                    rawList.forEach(item => uniqueMap.set(item.barcode, item));
+                    products = Array.from(uniqueMap.values());
+
                     const statusDiv = document.getElementById('status');
                     if (products.length > 0) {
-                        statusDiv.innerText = `✅ النظام جاهز (${products.length} منتج مسجل)`;
+                        statusDiv.innerText = `✅ النظام جاهز (${products.length} منتج مسجل ومحدّث)`;
                         statusDiv.style.color = "#16a34a";
                     }
                 }
@@ -249,45 +251,54 @@
         }
         loadProductsFromGoogle();
 
-        // معالجة الملف المرفوع وإرساله لجوجل شيت
+        // معالجة وتحديث الملف المرفوع
         function handleFileUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
 
             const uploadStatus = document.getElementById('upload-status');
-            uploadStatus.innerText = "⏳ جاري قراءة الملف وتجهيز المنتجات...";
+            uploadStatus.innerText = "⏳ جاري قراءة ومطابقة المنتجات مع الأسعار الجديدة...";
             uploadStatus.style.color = "#d97706";
 
             Papa.parse(file, {
                 header: true,
                 skipEmptyLines: true,
                 complete: function(results) {
-                    const parsedData = results.data.map(extractProductFields).filter(item => item.barcode !== "");
+                    const rawUploaded = results.data.map(extractProductFields).filter(item => item.barcode !== "");
 
-                    if (parsedData.length === 0) {
+                    if (rawUploaded.length === 0) {
                         uploadStatus.innerText = "❌ لم يتم العثور على منتجات صالحة في الملف المرفوع.";
                         uploadStatus.style.color = "#dc2626";
                         return;
                     }
 
-                    uploadStatus.innerText = `⏳ جاري حفظ ${parsedData.length} منتج في جدول جوجل...`;
+                    // تنقية الملف المرفوع نفسه من التكرار (اعتماد الجديد)
+                    const uploadMap = new Map();
+                    rawUploaded.forEach(item => uploadMap.set(item.barcode, item));
+                    const cleanUploadList = Array.from(uploadMap.values());
 
-                    // إرسال البيانات إلى Google Apps Script
+                    uploadStatus.innerText = `⏳ جاري إرسال التحديثات لجدول جوجل...`;
+
+                    // إرسال البيانات لجوجل لتحديث القديم وإضافة الجديد
                     fetch(webAppUrl, {
                         method: 'POST',
                         mode: 'no-cors',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(parsedData)
+                        body: JSON.stringify(cleanUploadList)
                     }).then(() => {
-                        uploadStatus.innerText = `✅ تم إرسال ${parsedData.length} منتج بنجاح إلى جدول جوجل!`;
+                        uploadStatus.innerText = `✅ تم تحديث الأسعار والمنتجات بنجاح في Google Sheets!`;
                         uploadStatus.style.color = "#16a34a";
                     }).catch(() => {
-                        uploadStatus.innerText = `⚠️ تم تفعيل المنتجات محلياً (حدث خطأ بالاتصال بجوجل).`;
+                        uploadStatus.innerText = `⚠️ تم التحديث محلياً في الصفحة (فشل الاتصال بجوجل).`;
                     });
 
-                    // دمج المنتجات الجديدة فوراً في الصفحة الحالية
-                    products = parsedData.concat(products);
-                    document.getElementById('status').innerText = `✅ النظام جاهز (${products.length} منتج مسجل)`;
+                    // تحديث قائمة المنتجات في الصفحة فورياً دون تكرار
+                    const currentMap = new Map();
+                    products.forEach(p => currentMap.set(p.barcode, p));
+                    cleanUploadList.forEach(p => currentMap.set(p.barcode, p)); // استبدال القديم بالجديد
+                    products = Array.from(currentMap.values());
+
+                    document.getElementById('status').innerText = `✅ النظام جاهز (${products.length} منتج مسجل ومحدّث)`;
                 }
             });
         }
@@ -300,7 +311,6 @@
             } catch (e) {}
         }
 
-        // مطابقة الباركود بمرونة
         function findProduct(code) {
             const rawScan = cleanString(code);
             const noZerosScan = rawScan.replace(/^0+/, '');
