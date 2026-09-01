@@ -4,34 +4,95 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ماسح أسعار المنتجات</title>
+    <!-- مكتبة الكاميرا ومسح الباركود -->
     <script src="https://unpkg.com/html5-qrcode"></script>
+    <!-- مكتبة قراءة ملفات Google Sheets -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
-        body { font-family: system-ui, -apple-system, sans-serif; text-align: center; background-color: #f4f7f6; padding: 15px; margin: 0; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            text-align: center;
+            background-color: #f4f7f6;
+            padding: 15px;
+            margin: 0;
+        }
         h2 { color: #2c3e50; margin: 10px 0; }
-        #status { font-weight: bold; margin-bottom: 12px; font-size: 15px; color: #d35400; }
-        #reader { width: 100%; max-width: 400px; margin: 0 auto; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1); background: #fff; }
-        #result { margin-top: 15px; max-width: 400px; margin-left: auto; margin-right: auto; padding: 18px; border-radius: 12px; background: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.1); display: none; }
-        .product-name { font-size: 20px; color: #2980b9; margin-bottom: 8px; font-weight: bold; }
-        .price { font-size: 22px; color: #27ae60; font-weight: bold; }
-        .old-price { text-decoration: line-through; color: #7f8c8d; font-size: 16px; margin-bottom: 4px; }
-        .offer { font-size: 24px; color: #e74c3c; font-weight: bold; }
-        .desc { font-size: 14px; color: #7f8c8d; margin-bottom: 6px; }
-        .error { color: #c0392b; font-weight: bold; font-size: 16px; }
+        #status {
+            font-weight: bold;
+            margin-bottom: 12px;
+            font-size: 15px;
+            color: #d35400;
+        }
+        #reader {
+            width: 100%;
+            max-width: 380px;
+            margin: 0 auto;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            background: #000;
+        }
+        #result {
+            margin-top: 15px;
+            max-width: 380px;
+            margin-left: auto;
+            margin-right: auto;
+            padding: 18px;
+            border-radius: 12px;
+            background: #fff;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            display: none;
+        }
+        .product-name {
+            font-size: 20px;
+            color: #2980b9;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        .price {
+            font-size: 22px;
+            color: #27ae60;
+            font-weight: bold;
+        }
+        .old-price {
+            text-decoration: line-through;
+            color: #7f8c8d;
+            font-size: 16px;
+            margin-bottom: 4px;
+        }
+        .offer {
+            font-size: 24px;
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        .desc {
+            font-size: 14px;
+            color: #7f8c8d;
+            margin-bottom: 6px;
+        }
+        .error {
+            color: #c0392b;
+            font-weight: bold;
+            font-size: 16px;
+        }
     </style>
 </head>
 <body>
 
     <h2>📱 ماسح أسعار المحل</h2>
-    <div id="status">⏳ جاري فحص وتحميل المنتجات...</div>
+    <div id="status">⏳ جاري تحميل البيانات وتشغيل الكاميرا...</div>
     
     <div id="reader"></div>
     <div id="result"></div>
 
     <script>
         let products = [];
+        let html5QrCode = null;
+        let isScanning = true;
+
         const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQCpR9i8vwj3iwcjDyB3xQjx2iTaD3s1kLjYRbwNQW-IOcrdADwRE4mBGbk96pxKGKLYqfbpjVuDLqI/pub?output=csv";
 
+        // تحميل البيانات من Google Sheets
         Papa.parse(sheetUrl, {
             download: true,
             header: true,
@@ -40,9 +101,9 @@
                 products = results.data;
                 const statusDiv = document.getElementById('status');
                 if (products.length > 0) {
-                    statusDiv.innerText = `✅ تم تحميل ${products.length} منتج بنجاح! الكاميرا جاهزة.`;
+                    statusDiv.innerText = `✅ تم تحميل ${products.length} منتج! جاري فتح الكاميرا...`;
                     statusDiv.style.color = "#27ae60";
-                    startCamera();
+                    startDirectCamera();
                 } else {
                     statusDiv.innerText = "⚠️ لم يتم العثور على بيانات داخل الجدول.";
                     statusDiv.style.color = "#c0392b";
@@ -50,7 +111,7 @@
             },
             error: function() {
                 const statusDiv = document.getElementById('status');
-                statusDiv.innerText = "❌ تعذر قراءة الملف من Google Sheets. تأكد من إعدادات المشاركة.";
+                statusDiv.innerText = "❌ تعذر قراءة البيانات من جوجل.";
                 statusDiv.style.color = "#c0392b";
             }
         });
@@ -67,6 +128,30 @@
                 const pBarcode = cleanString(p.barcode || p.Barcode || p['بار كود'] || p['كود']);
                 const pNoZeros = pBarcode.replace(/^0+/, '');
                 return (pBarcode === rawScan) || (noZerosScan !== "" && noZerosScan === pNoZeros);
+            });
+        }
+
+        // تشغيل الكاميرا الخلفية مباشرة دون سؤال المستخدم
+        function startDirectCamera() {
+            html5QrCode = new Html5Qrcode("reader");
+            
+            const config = { 
+                fps: 10, 
+                qrbox: { width: 250, height: 180 },
+                aspectRatio: 1.0
+            };
+
+            // { facingMode: "environment" } تعني الكاميرا الخلفية مباشرة
+            html5QrCode.start(
+                { facingMode: "environment" }, 
+                config, 
+                onScanSuccess
+            ).then(() => {
+                document.getElementById('status').innerText = "📷 الكاميرا جاهزة للمسح";
+            }).catch(err => {
+                console.error(err);
+                document.getElementById('status').innerText = "⚠️ يرجى السماح بالوصول للكاميرا من إعدادات المتصفح";
+                document.getElementById('status').style.color = "#c0392b";
             });
         }
 
@@ -96,15 +181,6 @@
             } else {
                 resultDiv.innerHTML = `<div class="error">❌ المنتج غير مسجل بالنظام<br><small style="color:#555;">(كود: ${decodedText})</small></div>`;
             }
-        }
-
-        function startCamera() {
-            const html5QrcodeScanner = new Html5QrcodeScanner(
-                "reader", 
-                { fps: 10, qrbox: { width: 250, height: 200 } }, 
-                false
-            );
-            html5QrcodeScanner.render(onScanSuccess);
         }
     </script>
 </body>
