@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>كاشير وماسح أسعار المحل</title>
+    <title>كاشير ومحاسبة المحل</title>
     <!-- مكتبة الكاميرا ومسح الباركود -->
     <script src="https://unpkg.com/html5-qrcode"></script>
     <!-- مكتبة قراءة CSV -->
@@ -65,38 +65,38 @@
             display: block;
         }
 
-        /* كرت آخر منتج ممسوح مع دعم الصورة */
+        /* كرت آخر منتج ممسوح مع شارة الماركة */
         #last-scanned {
             background: #ffffff;
             border-radius: 14px;
-            padding: 15px;
+            padding: 16px;
             margin-bottom: 15px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.06);
             display: none;
             border-right: 6px solid #2563eb;
             text-align: right;
         }
-        .scanned-flex {
-            display: flex;
-            align-items: center;
-            gap: 12px;
+
+        /* شارة الماركة (Brand Badge) */
+        .brand-badge {
+            display: inline-block;
+            background: #e0e7ff;
+            color: #3730a3;
+            font-size: 13px;
+            font-weight: bold;
+            padding: 4px 10px;
+            border-radius: 6px;
+            margin-bottom: 6px;
         }
-        .product-img-box {
-            width: 65px;
-            height: 65px;
-            border-radius: 10px;
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-            flex-shrink: 0;
-        }
-        .product-img-box img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
+        .brand-tag-small {
+            background: #f1f5f9;
+            color: #475569;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid #cbd5e1;
+            margin-left: 5px;
         }
 
         .total-card {
@@ -159,14 +159,14 @@
         .cart-items, .invoice-list { list-style: none; padding: 0; margin: 0; max-height: 250px; overflow-y: auto; }
         .cart-item {
             display: flex;
+            justify-content: space-between;
             align-items: center;
             padding: 10px 0;
             border-bottom: 1px solid #f8fafc;
-            gap: 10px;
         }
         .item-info { flex-grow: 1; }
         .item-name { font-weight: 700; font-size: 16px; }
-        .item-sub { font-size: 13px; color: #64748b; }
+        .item-sub { font-size: 13px; color: #64748b; margin-top: 3px; }
         .item-price { font-size: 18px; font-weight: bold; color: #16a34a; text-align: left; }
         .offer-price { color: #dc2626; }
         .empty-msg { text-align: center; color: #94a3b8; padding: 20px; font-size: 15px; }
@@ -275,7 +275,7 @@
             <button class="btn-close-cam" onclick="closeScanner()">❌ إلغاء وإغلاق الكاميرا</button>
         </div>
 
-        <!-- كرت آخر منتج ممسوح بصورته -->
+        <!-- كرت آخر منتج ممسوح مع الماركة -->
         <div id="last-scanned"></div>
 
         <!-- المجموع الكلي -->
@@ -356,7 +356,6 @@
     <script>
         let products = [];
         let cart = [];
-        let imageCache = {}; // تخزين مؤقت للصور حتى لا يحملها مرتين
         let invoices = JSON.parse(localStorage.getItem('store_invoices') || '[]');
         let html5QrCode = null;
         let isCameraRunning = false;
@@ -367,14 +366,29 @@
 
         function cleanString(val) { return val ? String(val).trim() : ""; }
 
+        // استخراج الماركة بذكاء
+        function extractBrand(item, productName) {
+            let brand = cleanString(item.Brand || item.brand || item.Marke || item.marke || item.Kategorie || item.kategorie || item['الماركة'] || item['الشركة']);
+            
+            // إذا لم يكن هناك عمود للماركة، استخرج ما بين القوسين من اسم المنتج
+            if (!brand && productName) {
+                const match = productName.match(/\((.*?)\)/);
+                if (match && match[1]) {
+                    brand = match[1].trim();
+                }
+            }
+            return brand;
+        }
+
         function extractProductFields(item) {
             const barcode = cleanString(item.Barcode || item.barcode || item['بار كود'] || item['كود'] || item['BARCODE']);
-            const name = cleanString(item.Produkt || item.produkt || item.name || item.Name || item['الاسم'] || item['اسم المنتج']);
+            const rawName = cleanString(item.Produkt || item.produkt || item.name || item.Name || item['الاسم'] || item['اسم المنتج']);
             const price = cleanString(item.Preis || item.preis || item.price || item.Price || item['السعر']);
             const offer = cleanString(item.Offer || item.offer || item['العرض'] || item['سعر العرض']);
             const desc = cleanString(item.Beschreibung || item.beschreibung || item.desc || item.Description || item['الوصف'] || item['الوزن']);
-            const image = cleanString(item.Image || item.image || item.Bild || item.bild || '');
-            return { barcode, name, price, offer, desc, image };
+            const brand = extractBrand(item, rawName);
+            
+            return { barcode, name: rawName, price, offer, desc, brand };
         }
 
         function loadProductsFromGoogle() {
@@ -398,26 +412,6 @@
         }
         loadProductsFromGoogle();
         renderInvoicesUI();
-
-        // دالة سحب صورة المنتج تلقائياً من الإنترنت عبر الباركود
-        async function fetchProductImage(barcode, manualImg) {
-            if (manualImg) return manualImg;
-            if (imageCache[barcode]) return imageCache[barcode];
-
-            try {
-                const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
-                const data = await response.json();
-                if (data.status === 1 && data.product && data.product.image_front_small_url) {
-                    const imgUrl = data.product.image_front_small_url;
-                    imageCache[barcode] = imgUrl;
-                    return imgUrl;
-                }
-            } catch (err) {
-                // تجاهل في حالة عدم توفر إنترنت أو عدم وجود صورة
-            }
-
-            return null; // لا توجد صورة
-        }
 
         function playBeepSound() {
             try {
@@ -462,7 +456,7 @@
             }
         }
 
-        async function onScanSuccess(decodedText) {
+        function onScanSuccess(decodedText) {
             playBeepSound();
             closeScanner();
 
@@ -475,38 +469,28 @@
                 const rawPrice = cleanString(product.price || '0').replace(',', '.');
                 const rawOffer = cleanString(product.offer || '').replace(',', '.');
                 const desc = product.desc || '';
+                const brand = product.brand || '';
 
                 const hasOffer = (rawOffer !== "" && !isNaN(parseFloat(rawOffer)));
                 const finalPrice = hasOffer ? parseFloat(rawOffer) : parseFloat(rawPrice);
 
-                // جلب صورة المنتج من قاعدة البيانات
-                const imgUrl = await fetchProductImage(product.barcode, product.image);
-
-                const itemObj = {
+                cart.unshift({
                     name: name,
+                    brand: brand,
                     desc: desc,
                     price: finalPrice,
                     isOffer: hasOffer,
-                    originalPrice: parseFloat(rawPrice),
-                    image: imgUrl
-                };
+                    originalPrice: parseFloat(rawPrice)
+                });
 
-                cart.unshift(itemObj);
-
-                const imgHtml = imgUrl 
-                    ? `<img src="${imgUrl}" alt="${name}">` 
-                    : `<span style="font-size:28px;">🛒</span>`;
+                const brandHtml = brand ? `<div class="brand-badge">🏷️ الماركة: ${brand}</div>` : '';
 
                 lastScannedDiv.innerHTML = `
-                    <div class="scanned-flex">
-                        <div class="product-img-box">${imgHtml}</div>
-                        <div>
-                            <div style="color: #16a34a; font-weight: bold; font-size: 15px;">✅ تمت الإضافة:</div>
-                            <div style="font-size: 17px; font-weight: 800; color: #0f172a;">${name}</div>
-                            <div style="font-size: 16px; color: ${hasOffer ? '#dc2626' : '#16a34a'}; font-weight: bold;">
-                                السعر: ${finalPrice.toFixed(2)} € ${hasOffer ? '(عرض 🔥)' : ''}
-                            </div>
-                        </div>
+                    ${brandHtml}
+                    <div style="font-size: 18px; font-weight: 800; color: #0f172a; line-height: 1.3;">${name}</div>
+                    <div style="font-size: 15px; color: #64748b; margin-top: 4px;">${desc ? desc : ''}</div>
+                    <div style="font-size: 22px; color: ${hasOffer ? '#dc2626' : '#16a34a'}; font-weight: 900; margin-top: 6px;">
+                        ${finalPrice.toFixed(2)} € ${hasOffer ? '<span style="font-size:14px; background:#fee2e2; padding:2px 8px; border-radius:50px;">(عرض 🔥)</span>' : ''}
                     </div>
                 `;
                 updateCartUI();
@@ -539,15 +523,12 @@
 
             cart.forEach((item) => {
                 total += item.price;
-                const thumbHtml = item.image 
-                    ? `<img src="${item.image}" style="width:38px; height:38px; object-fit:contain; border-radius:6px; border:1px solid #e2e8f0;">` 
-                    : `<span style="font-size:20px; width:38px; text-align:center;">🛒</span>`;
+                const brandTag = item.brand ? `<span class="brand-tag-small">🏷️ ${item.brand}</span>` : '';
 
                 html += `
                     <li class="cart-item">
-                        ${thumbHtml}
                         <div class="item-info">
-                            <div class="item-name">${item.name}</div>
+                            <div class="item-name">${item.name} ${brandTag}</div>
                             <div class="item-sub">${item.desc ? item.desc + ' | ' : ''}${item.isOffer ? '🔥 عرض خاص' : ''}</div>
                         </div>
                         <div class="item-price ${item.isOffer ? 'offer-price' : ''}">
@@ -641,9 +622,10 @@
 
             let tbody = '';
             inv.items.forEach(item => {
+                const brandText = item.brand ? ` (${item.brand})` : '';
                 tbody += `
                     <tr>
-                        <td>${item.name}</td>
+                        <td>${item.name}${brandText}</td>
                         <td style="text-align: left; font-weight: bold;">${item.price.toFixed(2)} €</td>
                     </tr>
                 `;
