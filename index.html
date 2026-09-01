@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>كاشير وماسح أسعار المحل</title>
+    <!-- مكتبة الكاميرا ومسح الباركود -->
     <script src="https://unpkg.com/html5-qrcode"></script>
+    <!-- مكتبة قراءة ملفات CSV -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
         * { box-sizing: border-box; }
@@ -31,13 +33,39 @@
             border-radius: 16px;
             cursor: pointer;
             box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
-            margin-bottom: 15px;
+            margin-bottom: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 10px;
         }
         .btn-open-cam:active { transform: scale(0.98); background: #1d4ed8; }
+
+        /* نافذة رفع الملفات */
+        .upload-card {
+            background: #ffffff;
+            border: 2px dashed #cbd5e1;
+            border-radius: 14px;
+            padding: 14px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        .upload-label {
+            display: inline-block;
+            background: #0f172a;
+            color: #ffffff;
+            padding: 10px 18px;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 15px;
+            cursor: pointer;
+        }
+        #upload-status {
+            font-size: 13px;
+            margin-top: 8px;
+            font-weight: 600;
+            color: #64748b;
+        }
 
         #camera-wrapper {
             background: #000;
@@ -135,9 +163,17 @@
         <h2>🧾 كاشير ومحاسبة المحل</h2>
         <div id="status">⏳ جاري تحميل البيانات...</div>
 
+        <!-- زر فتح الكاميرا -->
         <button id="btn-start" class="btn-open-cam" onclick="openScanner()">
             <span>📷</span> فتح الكاميرا لمسح كود
         </button>
+
+        <!-- نافذة رفع الملفات -->
+        <div class="upload-card">
+            <label class="upload-label" for="file-input">📂 رفع ملف منتجات جديد (CSV)</label>
+            <input type="file" id="file-input" accept=".csv" style="display: none;" onchange="handleFileUpload(event)">
+            <div id="upload-status">يمكنك رفع ملف المنتجات (CSV) مباشرة لحفظه بجوجل</div>
+        </div>
 
         <div id="camera-wrapper">
             <div id="reader"></div>
@@ -162,6 +198,7 @@
         </div>
     </div>
 
+    <!-- صوت النقر الهادئ -->
     <audio id="beep-sound" preload="auto">
         <source src="https://assets.mixkit.co/active_storage/sfx/2578/2578-preview.mp3" type="audio/mpeg">
     </audio>
@@ -173,84 +210,119 @@
         let isCameraRunning = false;
         const beepAudio = document.getElementById('beep-sound');
 
-        // تشغيل النغمة الناعمة
-        function playBeepSound() {
-            try {
-                beepAudio.currentTime = 0;
-                beepAudio.volume = 0.5; // صوت هادئ ومريح
-                beepAudio.play().catch(e => console.log("الصوت:", e));
-            } catch (e) {
-                console.error(e);
-            }
-        }
-
+        // رابط قراءة البيانات من Google Sheets
         const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQCpR9i8vwj3iwcjDyB3xQjx2iTaD3s1kLjYRbwNQW-IOcrdADwRE4mBGbk96pxKGKLYqfbpjVuDLqI/pub?output=csv";
-
-        Papa.parse(sheetUrl, {
-            download: true,
-            header: true,
-            skipEmptyLines: true,
-            complete: function(results) {
-                products = results.data;
-                const statusDiv = document.getElementById('status');
-                if (products.length > 0) {
-                    statusDiv.innerText = `✅ النظام جاهز (${products.length} منتج مسجل)`;
-                    statusDiv.style.color = "#16a34a";
-                } else {
-                    statusDiv.innerText = "⚠️ لم يتم العثور على منتجات في الجدول.";
-                    statusDiv.style.color = "#dc2626";
-                }
-            },
-            error: function() {
-                const statusDiv = document.getElementById('status');
-                statusDiv.innerText = "❌ تعذر قراءة البيانات من جدول جوجل.";
-                statusDiv.style.color = "#dc2626";
-            }
-        });
+        
+        // رابط الـ Web App الخاص بك لإرسال الملفات تلقائياً
+        const webAppUrl = "https://script.google.com/macros/s/AKfycbxkrlCtQUsFsSYWHGLSqQzo1JizU0q6flEYiGjw1UnuMg4oHU1SVUfUv2PAzFGaKZUD/exec";
 
         function cleanString(val) {
             return val ? String(val).trim() : "";
         }
 
+        // دالة ذكية لاستخراج الحقول بغض النظر عن أسماء الأعمدة (ألماني/إنجليزي/عربي)
+        function extractProductFields(item) {
+            const barcode = cleanString(item.Barcode || item.barcode || item['بار كود'] || item['كود'] || item['BARCODE']);
+            const name = cleanString(item.Produkt || item.produkt || item.name || item.Name || item['الاسم'] || item['اسم المنتج']);
+            const price = cleanString(item.Preis || item.preis || item.price || item.Price || item['السعر']);
+            const offer = cleanString(item.Offer || item.offer || item['العرض'] || item['سعر العرض']);
+            const desc = cleanString(item.Beschreibung || item.beschreibung || item.desc || item.Description || item['الوصف'] || item['الوزن']);
+            
+            return { barcode, name, price, offer, desc };
+        }
+
+        // تحميل البيانات من Google Sheets
+        function loadProductsFromGoogle() {
+            Papa.parse(sheetUrl, {
+                download: true,
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    products = results.data.map(extractProductFields).filter(p => p.barcode !== "");
+                    const statusDiv = document.getElementById('status');
+                    if (products.length > 0) {
+                        statusDiv.innerText = `✅ النظام جاهز (${products.length} منتج مسجل)`;
+                        statusDiv.style.color = "#16a34a";
+                    }
+                }
+            });
+        }
+        loadProductsFromGoogle();
+
+        // معالجة الملف المرفوع وإرساله لجوجل شيت
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const uploadStatus = document.getElementById('upload-status');
+            uploadStatus.innerText = "⏳ جاري قراءة الملف وتجهيز المنتجات...";
+            uploadStatus.style.color = "#d97706";
+
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    const parsedData = results.data.map(extractProductFields).filter(item => item.barcode !== "");
+
+                    if (parsedData.length === 0) {
+                        uploadStatus.innerText = "❌ لم يتم العثور على منتجات صالحة في الملف المرفوع.";
+                        uploadStatus.style.color = "#dc2626";
+                        return;
+                    }
+
+                    uploadStatus.innerText = `⏳ جاري حفظ ${parsedData.length} منتج في جدول جوجل...`;
+
+                    // إرسال البيانات إلى Google Apps Script
+                    fetch(webAppUrl, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(parsedData)
+                    }).then(() => {
+                        uploadStatus.innerText = `✅ تم إرسال ${parsedData.length} منتج بنجاح إلى جدول جوجل!`;
+                        uploadStatus.style.color = "#16a34a";
+                    }).catch(() => {
+                        uploadStatus.innerText = `⚠️ تم تفعيل المنتجات محلياً (حدث خطأ بالاتصال بجوجل).`;
+                    });
+
+                    // دمج المنتجات الجديدة فوراً في الصفحة الحالية
+                    products = parsedData.concat(products);
+                    document.getElementById('status').innerText = `✅ النظام جاهز (${products.length} منتج مسجل)`;
+                }
+            });
+        }
+
+        function playBeepSound() {
+            try {
+                beepAudio.currentTime = 0;
+                beepAudio.volume = 0.5;
+                beepAudio.play().catch(e => console.log(e));
+            } catch (e) {}
+        }
+
+        // مطابقة الباركود بمرونة
         function findProduct(code) {
             const rawScan = cleanString(code);
             const noZerosScan = rawScan.replace(/^0+/, '');
 
             return products.find(p => {
-                const pBarcode = cleanString(p.barcode || p.Barcode || p['بار كود'] || p['كود']);
+                const pBarcode = cleanString(p.barcode);
                 const pNoZeros = pBarcode.replace(/^0+/, '');
                 return (pBarcode === rawScan) || (noZerosScan !== "" && noZerosScan === pNoZeros);
             });
         }
 
         function openScanner() {
-            // تنشيط الصوت للآيفون عند الضغط
-            beepAudio.play().then(() => {
-                beepAudio.pause();
-                beepAudio.currentTime = 0;
-            }).catch(() => {});
-
+            beepAudio.play().then(() => { beepAudio.pause(); beepAudio.currentTime = 0; }).catch(() => {});
             document.getElementById('camera-wrapper').style.display = 'block';
             document.getElementById('btn-start').style.display = 'none';
 
-            if (!html5QrCode) {
-                html5QrCode = new Html5Qrcode("reader");
-            }
+            if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
 
-            const config = { 
-                fps: 15, 
-                qrbox: { width: 280, height: 180 },
-                aspectRatio: 1.0
-            };
-
+            const config = { fps: 15, qrbox: { width: 280, height: 180 }, aspectRatio: 1.0 };
             html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
-                .then(() => {
-                    isCameraRunning = true;
-                })
-                .catch(err => {
-                    alert("يرجى إعطاء الإذن للكاميرا بالعمل.");
-                    closeScanner();
-                });
+                .then(() => { isCameraRunning = true; })
+                .catch(() => { alert("يرجى تفعيل صلاحية الكاميرا"); closeScanner(); });
         }
 
         function closeScanner() {
@@ -275,10 +347,10 @@
             lastScannedDiv.style.display = 'block';
 
             if (product) {
-                const name = cleanString(product.name || product.Produkt || product['الاسم'] || 'منتج');
-                const rawPrice = cleanString(product.price || product.Preis || product['السعر'] || '0').replace(',', '.');
-                const rawOffer = cleanString(product.offer || product.Offer || product['العرض']).replace(',', '.');
-                const desc = cleanString(product.Beschreibung || product.desc || '');
+                const name = product.name || 'منتج';
+                const rawPrice = cleanString(product.price || '0').replace(',', '.');
+                const rawOffer = cleanString(product.offer || '').replace(',', '.');
+                const desc = product.desc || '';
 
                 const hasOffer = (rawOffer !== "" && !isNaN(parseFloat(rawOffer)));
                 const finalPrice = hasOffer ? parseFloat(rawOffer) : parseFloat(rawPrice);
