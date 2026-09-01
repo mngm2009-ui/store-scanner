@@ -196,7 +196,7 @@
         <h2>🧾 كاشير ومحاسبة المحل</h2>
         <div id="status">⏳ جاري تحميل البيانات...</div>
 
-        <!-- زر فتح الكاميرا عند الطلب فقط -->
+        <!-- زر فتح الكاميرا -->
         <button id="btn-start" class="btn-open-cam" onclick="openScanner()">
             <span>📷</span> فتح الكاميرا لمسح كود
         </button>
@@ -207,7 +207,7 @@
             <button class="btn-close-cam" onclick="closeScanner()">❌ إلغاء وإغلاق الكاميرا</button>
         </div>
 
-        <!-- إشعار آخر منتج تم مسحه -->
+        <!-- إشعار آخر منتج -->
         <div id="last-scanned"></div>
 
         <!-- شريط المجموع الكلي -->
@@ -216,7 +216,7 @@
             <div class="total-amount" id="grand-total">0.00 €</div>
         </div>
 
-        <!-- سجل المنتجات الممسوحة -->
+        <!-- سجل السلة -->
         <div class="cart-section">
             <div class="cart-header">
                 <h3>🛒 المنتجات المسجلة (<span id="items-count">0</span>)</h3>
@@ -233,6 +233,36 @@
         let cart = [];
         let html5QrCode = null;
         let isCameraRunning = false;
+        let audioCtx = null;
+
+        // دالة توليد صوت البيب (Scanner Beep)
+        function playBeepSound() {
+            try {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                
+                osc.type = "sine";
+                osc.frequency.setValueAtTime(1800, audioCtx.currentTime); // تردد نغمة الماسح
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.12);
+                
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.12);
+
+                // اهتزاز خفيف للهاتف
+                if (navigator.vibrate) {
+                    navigator.vibrate(80);
+                }
+            } catch (e) {
+                console.error("تعذر تشغيل الصوت", e);
+            }
+        }
 
         const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQCpR9i8vwj3iwcjDyB3xQjx2iTaD3s1kLjYRbwNQW-IOcrdADwRE4mBGbk96pxKGKLYqfbpjVuDLqI/pub?output=csv";
 
@@ -275,8 +305,13 @@
             });
         }
 
-        // فتح الكاميرا عند طلبك
+        // فتح الكاميرا عند الطلب
         function openScanner() {
+            // تهيئة الصوت عند أول ضغطة لضمان عمله في متصفحات الموبايل
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+
             document.getElementById('camera-wrapper').style.display = 'block';
             document.getElementById('btn-start').style.display = 'none';
 
@@ -316,7 +351,10 @@
 
         // عند التقاط الكود بنجاح
         function onScanSuccess(decodedText) {
-            // إغلاق الكاميرا فوراً
+            // تشغيل صوت البيب فوراً
+            playBeepSound();
+
+            // إغلاق الكاميرا
             closeScanner();
 
             const product = findProduct(decodedText);
@@ -376,7 +414,7 @@
             let total = 0;
             let html = '';
 
-            cart.forEach((item, index) => {
+            cart.forEach((item) => {
                 total += item.price;
                 html += `
                     <li class="cart-item">
