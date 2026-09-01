@@ -4,9 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>كاشير وماسح أسعار المحل</title>
-    <!-- مكتبة الكاميرا ومسح الباركود -->
     <script src="https://unpkg.com/html5-qrcode"></script>
-    <!-- مكتبة قراءة جداول Google Sheets -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
         * { box-sizing: border-box; }
@@ -164,9 +162,8 @@
         </div>
     </div>
 
-    <!-- ملف صوت البيب متوافق مع Safari و iOS -->
     <audio id="beep-sound" preload="auto">
-        <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+        <source src="https://assets.mixkit.co/active_storage/sfx/2578/2578-preview.mp3" type="audio/mpeg">
     </audio>
 
     <script>
@@ -176,11 +173,12 @@
         let isCameraRunning = false;
         const beepAudio = document.getElementById('beep-sound');
 
-        // تشغيل صوت البيب
+        // تشغيل النغمة الناعمة
         function playBeepSound() {
             try {
                 beepAudio.currentTime = 0;
-                beepAudio.play().catch(e => console.log("الصوت محظور مؤقتاً:", e));
+                beepAudio.volume = 0.5; // صوت هادئ ومريح
+                beepAudio.play().catch(e => console.log("الصوت:", e));
             } catch (e) {
                 console.error(e);
             }
@@ -188,7 +186,6 @@
 
         const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQCpR9i8vwj3iwcjDyB3xQjx2iTaD3s1kLjYRbwNQW-IOcrdADwRE4mBGbk96pxKGKLYqfbpjVuDLqI/pub?output=csv";
 
-        // تحميل البيانات من Google Sheets
         Papa.parse(sheetUrl, {
             download: true,
             header: true,
@@ -227,7 +224,7 @@
         }
 
         function openScanner() {
-            // تفعيل وتجهيز مشغل الصوت في الآيفون عند ضغط الزر
+            // تنشيط الصوت للآيفون عند الضغط
             beepAudio.play().then(() => {
                 beepAudio.pause();
                 beepAudio.currentTime = 0;
@@ -270,9 +267,7 @@
         }
 
         function onScanSuccess(decodedText) {
-            // تشغيل صوت البيب فوراً
             playBeepSound();
-
             closeScanner();
 
             const product = findProduct(decodedText);
