@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>كاشير وماسح أسعار المحل</title>
+    <title>كاشير ومحاسبة المحل</title>
     <!-- مكتبة الكاميرا ومسح الباركود -->
     <script src="https://unpkg.com/html5-qrcode"></script>
-    <!-- مكتبة قراءة ملفات CSV -->
+    <!-- مكتبة قراءة CSV -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
         * { box-sizing: border-box; }
@@ -14,11 +14,10 @@
             font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             text-align: center;
             background-color: #f1f5f9;
-            padding: 15px 15px 70px 15px; /* مساحة بالأسفل لزر الزاوية */
+            padding: 15px 15px 80px 15px;
             margin: 0;
             color: #1e293b;
             min-height: 100vh;
-            position: relative;
         }
         .container { max-width: 500px; margin: 0 auto; }
         h2 { margin: 5px 0 10px 0; font-size: 24px; }
@@ -81,8 +80,8 @@
             background: #0f172a;
             color: #ffffff;
             border-radius: 16px;
-            padding: 20px;
-            margin-bottom: 20px;
+            padding: 18px 20px;
+            margin-bottom: 12px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -91,14 +90,32 @@
         .total-title { font-size: 20px; font-weight: 600; color: #94a3b8; }
         .total-amount { font-size: 36px; font-weight: 900; color: #22c55e; }
 
-        .cart-section {
+        /* زر تم الدفع */
+        .btn-pay {
+            width: 100%;
+            background: #16a34a;
+            color: #ffffff;
+            border: none;
+            padding: 18px;
+            font-size: 22px;
+            font-weight: bold;
+            border-radius: 16px;
+            cursor: pointer;
+            box-shadow: 0 6px 18px rgba(22, 163, 74, 0.4);
+            margin-bottom: 20px;
+            display: none;
+        }
+        .btn-pay:active { transform: scale(0.98); background: #15803d; }
+
+        .cart-section, .invoices-section {
             background: #ffffff;
             border-radius: 16px;
             padding: 15px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.06);
             text-align: right;
+            margin-bottom: 20px;
         }
-        .cart-header {
+        .section-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -106,7 +123,7 @@
             padding-bottom: 10px;
             margin-bottom: 10px;
         }
-        .cart-header h3 { margin: 0; font-size: 18px; }
+        .section-header h3 { margin: 0; font-size: 18px; }
         .btn-clear {
             background: #fee2e2;
             color: #dc2626;
@@ -117,7 +134,7 @@
             font-weight: bold;
             cursor: pointer;
         }
-        .cart-items { list-style: none; padding: 0; margin: 0; max-height: 280px; overflow-y: auto; }
+        .cart-items, .invoice-list { list-style: none; padding: 0; margin: 0; max-height: 250px; overflow-y: auto; }
         .cart-item {
             display: flex;
             justify-content: space-between;
@@ -132,7 +149,29 @@
         .offer-price { color: #dc2626; }
         .empty-msg { text-align: center; color: #94a3b8; padding: 20px; font-size: 15px; }
 
-        /* زر الإدارة والرفع في أقصى الزاوية السفلية */
+        /* تنسيق بطاقة الفاتورة في السجل */
+        .invoice-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .btn-pdf {
+            background: #0f172a;
+            color: #fff;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        /* زر الإدارة في الزاوية */
         .admin-corner {
             position: fixed;
             bottom: 15px;
@@ -158,9 +197,7 @@
             align-items: center;
             gap: 5px;
         }
-        .admin-btn:hover, .admin-btn:active {
-            opacity: 1;
-        }
+        .admin-btn:hover, .admin-btn:active { opacity: 1; }
         #upload-toast {
             font-size: 12px;
             font-weight: bold;
@@ -169,6 +206,37 @@
             padding: 6px 12px;
             border-radius: 8px;
             display: none;
+        }
+
+        /* نافذة المعاينة والطباعة للفاتورة */
+        #invoice-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 15px;
+        }
+        .modal-content {
+            background: #fff;
+            padding: 25px;
+            border-radius: 16px;
+            max-width: 380px;
+            width: 100%;
+            text-align: right;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        .receipt-table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 14px; }
+        .receipt-table th { border-bottom: 2px solid #000; padding: 6px 0; text-align: right; }
+        .receipt-table td { border-bottom: 1px dashed #ddd; padding: 8px 0; }
+
+        @media print {
+            body * { visibility: hidden; }
+            #printable-area, #printable-area * { visibility: visible; }
+            #printable-area { position: absolute; left: 0; top: 0; width: 100%; }
+            .no-print { display: none !important; }
         }
     </style>
 </head>
@@ -190,23 +258,68 @@
 
         <div id="last-scanned"></div>
 
+        <!-- المجموع الكلي -->
         <div class="total-card">
             <div class="total-title">المجموع الكلي:</div>
             <div class="total-amount" id="grand-total">0.00 €</div>
         </div>
 
+        <!-- زر تم الدفع -->
+        <button id="btn-pay" class="btn-pay" onclick="processPayment()">
+            💳 تم الدفع وحفظ الفاتورة
+        </button>
+
+        <!-- السلة الحالية -->
         <div class="cart-section">
-            <div class="cart-header">
-                <h3>🛒 المنتجات المسجلة (<span id="items-count">0</span>)</h3>
-                <button class="btn-clear" onclick="clearCart()">تصفير الفاتورة</button>
+            <div class="section-header">
+                <h3>🛒 السلة الحالية (<span id="items-count">0</span>)</h3>
+                <button class="btn-clear" onclick="clearCart()">مسح السلة</button>
             </div>
             <ul class="cart-items" id="cart-list">
                 <li class="empty-msg">لم يتم مسح أي منتج بعد</li>
             </ul>
         </div>
+
+        <!-- سجل الفواتير السابقة -->
+        <div class="invoices-section">
+            <div class="section-header">
+                <h3>📁 سجل الفواتير السابقة (<span id="invoices-count">0</span>)</h3>
+            </div>
+            <div class="invoice-list" id="invoices-list">
+                <div class="empty-msg">لا توجد فواتير سابقة اليوم</div>
+            </div>
+        </div>
     </div>
 
-    <!-- زر الزاوية المخفي والمخصص للإدارة فقط -->
+    <!-- نافذة منبثقة لطباعة/تصدير الفاتورة -->
+    <div id="invoice-modal">
+        <div class="modal-content" id="printable-area">
+            <div style="text-align:center; border-bottom: 2px dashed #000; padding-bottom: 10px;">
+                <h3 style="margin: 0; font-size: 20px;">🏪 فاتورة مشتريات</h3>
+                <div id="modal-invoice-id" style="font-size: 13px; color: #555; margin-top: 4px;"></div>
+                <div id="modal-invoice-date" style="font-size: 12px; color: #777;"></div>
+            </div>
+            <table class="receipt-table">
+                <thead>
+                    <tr>
+                        <th>المنتج</th>
+                        <th style="text-align: left;">السعر</th>
+                    </tr>
+                </thead>
+                <tbody id="modal-invoice-items"></tbody>
+            </table>
+            <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 18px; border-top: 2px solid #000; padding-top: 10px;">
+                <span>الإجمالي:</span>
+                <span id="modal-invoice-total">0.00 €</span>
+            </div>
+            <div style="margin-top: 20px; display: flex; gap: 10px;" class="no-print">
+                <button onclick="window.print()" style="flex:1; background:#16a34a; color:#fff; border:none; padding:12px; border-radius:8px; font-weight:bold; cursor:pointer;">🖨️ طباعة / PDF</button>
+                <button onclick="closeInvoiceModal()" style="background:#64748b; color:#fff; border:none; padding:12px 18px; border-radius:8px; font-weight:bold; cursor:pointer;">إغلاق</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- زر الزاوية للإدارة -->
     <div class="admin-corner">
         <label class="admin-btn" for="file-input">
             ⚙️ 📂 تحديث ملف CSV
@@ -215,7 +328,6 @@
         <div id="upload-toast"></div>
     </div>
 
-    <!-- صوت النقر الهادئ -->
     <audio id="beep-sound" preload="auto">
         <source src="https://assets.mixkit.co/active_storage/sfx/2578/2578-preview.mp3" type="audio/mpeg">
     </audio>
@@ -223,6 +335,7 @@
     <script>
         let products = [];
         let cart = [];
+        let invoices = JSON.parse(localStorage.getItem('store_invoices') || '[]');
         let html5QrCode = null;
         let isCameraRunning = false;
         const beepAudio = document.getElementById('beep-sound');
@@ -230,9 +343,7 @@
         const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQCpR9i8vwj3iwcjDyB3xQjx2iTaD3s1kLjYRbwNQW-IOcrdADwRE4mBGbk96pxKGKLYqfbpjVuDLqI/pub?output=csv";
         const webAppUrl = "https://script.google.com/macros/s/AKfycbxkrlCtQUsFsSYWHGLSqQzo1JizU0q6flEYiGjw1UnuMg4oHU1SVUfUv2PAzFGaKZUD/exec";
 
-        function cleanString(val) {
-            return val ? String(val).trim() : "";
-        }
+        function cleanString(val) { return val ? String(val).trim() : ""; }
 
         function extractProductFields(item) {
             const barcode = cleanString(item.Barcode || item.barcode || item['بار كود'] || item['كود'] || item['BARCODE']);
@@ -240,7 +351,6 @@
             const price = cleanString(item.Preis || item.preis || item.price || item.Price || item['السعر']);
             const offer = cleanString(item.Offer || item.offer || item['العرض'] || item['سعر العرض']);
             const desc = cleanString(item.Beschreibung || item.beschreibung || item.desc || item.Description || item['الوصف'] || item['الوزن']);
-            
             return { barcode, name, price, offer, desc };
         }
 
@@ -257,78 +367,26 @@
 
                     const statusDiv = document.getElementById('status');
                     if (products.length > 0) {
-                        statusDiv.innerText = `✅ النظام جاهز (${products.length} منتج مسجل ومحدّث)`;
+                        statusDiv.innerText = `✅ النظام جاهز (${products.length} منتج مسجل)`;
                         statusDiv.style.color = "#16a34a";
                     }
                 }
             });
         }
         loadProductsFromGoogle();
-
-        function showToast(msg, isError = false) {
-            const toast = document.getElementById('upload-toast');
-            toast.innerText = msg;
-            toast.style.display = 'block';
-            toast.style.color = isError ? '#dc2626' : '#16a34a';
-            setTimeout(() => { toast.style.display = 'none'; }, 4500);
-        }
-
-        function handleFileUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            showToast("⏳ جاري قراءة الملف...");
-
-            Papa.parse(file, {
-                header: true,
-                skipEmptyLines: true,
-                complete: function(results) {
-                    const rawUploaded = results.data.map(extractProductFields).filter(item => item.barcode !== "");
-
-                    if (rawUploaded.length === 0) {
-                        showToast("❌ لم يتم العثور على منتجات صالحة", true);
-                        return;
-                    }
-
-                    const uploadMap = new Map();
-                    rawUploaded.forEach(item => uploadMap.set(item.barcode, item));
-                    const cleanUploadList = Array.from(uploadMap.values());
-
-                    showToast(`⏳ جاري حفظ ${cleanUploadList.length} منتج في جوجل...`);
-
-                    fetch(webAppUrl, {
-                        method: 'POST',
-                        mode: 'no-cors',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(cleanUploadList)
-                    }).then(() => {
-                        showToast(`✅ تم تحديث ${cleanUploadList.length} منتج بنجاح!`);
-                    }).catch(() => {
-                        showToast("⚠️ تم التحديث محلياً فقط", true);
-                    });
-
-                    const currentMap = new Map();
-                    products.forEach(p => currentMap.set(p.barcode, p));
-                    cleanUploadList.forEach(p => currentMap.set(p.barcode, p));
-                    products = Array.from(currentMap.values());
-
-                    document.getElementById('status').innerText = `✅ النظام جاهز (${products.length} منتج مسجل ومحدّث)`;
-                }
-            });
-        }
+        renderInvoicesUI();
 
         function playBeepSound() {
             try {
                 beepAudio.currentTime = 0;
                 beepAudio.volume = 0.5;
-                beepAudio.play().catch(e => console.log(e));
+                beepAudio.play().catch(e => {});
             } catch (e) {}
         }
 
         function findProduct(code) {
             const rawScan = cleanString(code);
             const noZerosScan = rawScan.replace(/^0+/, '');
-
             return products.find(p => {
                 const pBarcode = cleanString(p.barcode);
                 const pNoZeros = pBarcode.replace(/^0+/, '');
@@ -342,7 +400,6 @@
             document.getElementById('btn-start').style.display = 'none';
 
             if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
-
             const config = { fps: 15, qrbox: { width: 280, height: 180 }, aspectRatio: 1.0 };
             html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
                 .then(() => { isCameraRunning = true; })
@@ -394,7 +451,6 @@
                         السعر: ${finalPrice.toFixed(2)} € ${hasOffer ? '(عرض 🔥)' : ''}
                     </div>
                 `;
-
                 updateCartUI();
             } else {
                 lastScannedDiv.innerHTML = `
@@ -408,15 +464,18 @@
             const listEl = document.getElementById('cart-list');
             const totalEl = document.getElementById('grand-total');
             const countEl = document.getElementById('items-count');
+            const btnPay = document.getElementById('btn-pay');
 
             countEl.innerText = cart.length;
 
             if (cart.length === 0) {
                 listEl.innerHTML = '<li class="empty-msg">لم يتم مسح أي منتج بعد</li>';
                 totalEl.innerText = '0.00 €';
+                btnPay.style.display = 'none';
                 return;
             }
 
+            btnPay.style.display = 'block';
             let total = 0;
             let html = '';
 
@@ -440,11 +499,127 @@
         }
 
         function clearCart() {
-            if (cart.length > 0 && confirm("هل أنت متأكد من مسح الفاتورة والبدء من جديد؟")) {
+            if (cart.length > 0 && confirm("هل أنت متأكد من مسح السلة؟")) {
                 cart = [];
                 document.getElementById('last-scanned').style.display = 'none';
                 updateCartUI();
             }
+        }
+
+        // إتمام عملية الدفع وحفظ الفاتورة
+        function processPayment() {
+            if (cart.length === 0) return;
+
+            let total = cart.reduce((sum, item) => sum + item.price, 0);
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('ar-EG') + ' ' + now.toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'});
+            const invoiceId = 'INV-' + Date.now().toString().slice(-6);
+
+            const newInvoice = {
+                id: invoiceId,
+                date: dateStr,
+                items: [...cart],
+                total: total
+            };
+
+            invoices.unshift(newInvoice);
+            localStorage.setItem('store_invoices', JSON.stringify(invoices));
+
+            // تفريغ السلة وتنبيه بالنجاح
+            cart = [];
+            document.getElementById('last-scanned').style.display = 'none';
+            updateCartUI();
+            renderInvoicesUI();
+
+            alert(`✅ تم تأكيد الدفع بنجاح!\nرقم الفاتورة: ${invoiceId}\nالمبلغ: ${total.toFixed(2)} €`);
+        }
+
+        // عرض سجل الفواتير السابقة
+        function renderInvoicesUI() {
+            const listEl = document.getElementById('invoices-list');
+            const countEl = document.getElementById('invoices-count');
+            countEl.innerText = invoices.length;
+
+            if (invoices.length === 0) {
+                listEl.innerHTML = '<div class="empty-msg">لا توجد فواتير سابقة</div>';
+                return;
+            }
+
+            let html = '';
+            invoices.forEach((inv, idx) => {
+                html += `
+                    <div class="invoice-card">
+                        <div>
+                            <div style="font-weight: bold; color:#0f172a;">#${inv.id}</div>
+                            <div style="font-size: 12px; color: #64748b;">${inv.date} (${inv.items.length} منتجات)</div>
+                            <div style="font-size: 16px; font-weight: bold; color: #16a34a; margin-top:3px;">${inv.total.toFixed(2)} €</div>
+                        </div>
+                        <button class="btn-pdf" onclick="viewInvoice(${idx})">📄 عرض / PDF</button>
+                    </div>
+                `;
+            });
+            listEl.innerHTML = html;
+        }
+
+        // فتح الفاتورة للطباعة وتصدير PDF
+        function viewInvoice(index) {
+            const inv = invoices[index];
+            document.getElementById('modal-invoice-id').innerText = `رقم الفاتورة: #${inv.id}`;
+            document.getElementById('modal-invoice-date').innerText = `التاريخ: ${inv.date}`;
+            document.getElementById('modal-invoice-total').innerText = `${inv.total.toFixed(2)} €`;
+
+            let tbody = '';
+            inv.items.forEach(item => {
+                tbody += `
+                    <tr>
+                        <td>${item.name}</td>
+                        <td style="text-align: left; font-weight: bold;">${item.price.toFixed(2)} €</td>
+                    </tr>
+                `;
+            });
+            document.getElementById('modal-invoice-items').innerHTML = tbody;
+            document.getElementById('invoice-modal').style.display = 'flex';
+        }
+
+        function closeInvoiceModal() {
+            document.getElementById('invoice-modal').style.display = 'none';
+        }
+
+        // معالجة رفع الملفات
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const toast = document.getElementById('upload-toast');
+            toast.innerText = "⏳ جاري قراءة وتحديث الملف...";
+            toast.style.display = 'block';
+
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    const rawUploaded = results.data.map(extractProductFields).filter(item => item.barcode !== "");
+                    const uploadMap = new Map();
+                    rawUploaded.forEach(item => uploadMap.set(item.barcode, item));
+                    const cleanUploadList = Array.from(uploadMap.values());
+
+                    fetch(webAppUrl, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(cleanUploadList)
+                    }).then(() => {
+                        toast.innerText = `✅ تم تحديث ${cleanUploadList.length} منتج بجوجل!`;
+                        setTimeout(() => { toast.style.display = 'none'; }, 4000);
+                    }).catch(() => { toast.style.display = 'none'; });
+
+                    const currentMap = new Map();
+                    products.forEach(p => currentMap.set(p.barcode, p));
+                    cleanUploadList.forEach(p => currentMap.set(p.barcode, p));
+                    products = Array.from(currentMap.values());
+                    document.getElementById('status').innerText = `✅ النظام جاهز (${products.length} منتج مسجل ومحدّث)`;
+                }
+            });
         }
     </script>
 </body>
