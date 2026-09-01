@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>كاشير ومحاسبة المحل</title>
+    <title>كاشير وماسح أسعار المحل</title>
     <!-- مكتبة الكاميرا ومسح الباركود -->
     <script src="https://unpkg.com/html5-qrcode"></script>
     <!-- مكتبة قراءة CSV -->
@@ -149,7 +149,7 @@
         .offer-price { color: #dc2626; }
         .empty-msg { text-align: center; color: #94a3b8; padding: 20px; font-size: 15px; }
 
-        /* تنسيق بطاقة الفاتورة في السجل */
+        /* بطاقة الفاتورة في السجل */
         .invoice-card {
             background: #f8fafc;
             border: 1px solid #e2e8f0;
@@ -280,13 +280,14 @@
             </ul>
         </div>
 
-        <!-- سجل الفواتير السابقة -->
+        <!-- سجل الفواتير السابقة مع زر التصفير -->
         <div class="invoices-section">
             <div class="section-header">
                 <h3>📁 سجل الفواتير السابقة (<span id="invoices-count">0</span>)</h3>
+                <button class="btn-clear" onclick="clearInvoices()">🗑️ مسح الأرشيف</button>
             </div>
             <div class="invoice-list" id="invoices-list">
-                <div class="empty-msg">لا توجد فواتير سابقة اليوم</div>
+                <div class="empty-msg">لا توجد فواتير سابقة</div>
             </div>
         </div>
     </div>
@@ -499,14 +500,13 @@
         }
 
         function clearCart() {
-            if (cart.length > 0 && confirm("هل أنت متأكد من مسح السلة؟")) {
+            if (cart.length > 0 && confirm("هل أنت متأكد من مسح السلة الحالية؟")) {
                 cart = [];
                 document.getElementById('last-scanned').style.display = 'none';
                 updateCartUI();
             }
         }
 
-        // إتمام عملية الدفع وحفظ الفاتورة
         function processPayment() {
             if (cart.length === 0) return;
 
@@ -525,7 +525,6 @@
             invoices.unshift(newInvoice);
             localStorage.setItem('store_invoices', JSON.stringify(invoices));
 
-            // تفريغ السلة وتنبيه بالنجاح
             cart = [];
             document.getElementById('last-scanned').style.display = 'none';
             updateCartUI();
@@ -534,7 +533,6 @@
             alert(`✅ تم تأكيد الدفع بنجاح!\nرقم الفاتورة: ${invoiceId}\nالمبلغ: ${total.toFixed(2)} €`);
         }
 
-        // عرض سجل الفواتير السابقة
         function renderInvoicesUI() {
             const listEl = document.getElementById('invoices-list');
             const countEl = document.getElementById('invoices-count');
@@ -561,7 +559,19 @@
             listEl.innerHTML = html;
         }
 
-        // فتح الفاتورة للطباعة وتصدير PDF
+        // دالة تصفير ومسح أرشيف الفواتير بالكامل
+        function clearInvoices() {
+            if (invoices.length === 0) {
+                alert("سجل الفواتير فارغ بالفعل.");
+                return;
+            }
+            if (confirm("هل أنت متأكد من رغبتك في مسح وتصفير جميع الفواتير السابقة؟ لا يمكن التراجع بعد ذلك.")) {
+                invoices = [];
+                localStorage.removeItem('store_invoices');
+                renderInvoicesUI();
+            }
+        }
+
         function viewInvoice(index) {
             const inv = invoices[index];
             document.getElementById('modal-invoice-id').innerText = `رقم الفاتورة: #${inv.id}`;
@@ -585,7 +595,6 @@
             document.getElementById('invoice-modal').style.display = 'none';
         }
 
-        // معالجة رفع الملفات
         function handleFileUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
