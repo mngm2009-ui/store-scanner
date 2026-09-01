@@ -4,73 +4,169 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ماسح أسعار المنتجات</title>
-    <!-- مكتبة تشغيل الكاميرا ومسح الباركود -->
+    <!-- مكتبة الكاميرا ومسح الباركود -->
     <script src="https://unpkg.com/html5-qrcode"></script>
+    <!-- مكتبة قراءة ملفات Google Sheets -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background-color: #f4f7f6; padding: 20px; }
-        #reader { width: 100%; max-width: 400px; margin: 0 auto; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.1); background: #fff; }
-        #result { margin-top: 20px; max-width: 400px; margin-left: auto; margin-right: auto; padding: 20px; border-radius: 10px; background: #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: none; }
-        h2 { color: #2c3e50; }
-        .product-name { font-size: 22px; color: #2980b9; margin-bottom: 10px; font-weight: bold; }
-        .price { font-size: 20px; color: #27ae60; font-weight: bold; }
-        .old-price { text-decoration: line-through; color: #95a5a6; font-size: 16px; margin-bottom: 5px; }
-        .offer { font-size: 22px; color: #e74c3c; font-weight: bold; }
-        .error { color: #c0392b; font-weight: bold; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            text-align: center;
+            background-color: #f4f7f6;
+            padding: 15px;
+            margin: 0;
+        }
+        h2 { color: #2c3e50; margin-bottom: 15px; }
+        #status {
+            font-weight: bold;
+            margin-bottom: 12px;
+            font-size: 15px;
+            color: #d35400;
+        }
+        #reader {
+            width: 100%;
+            max-width: 420px;
+            margin: 0 auto;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            background: #fff;
+        }
+        #result {
+            margin-top: 15px;
+            max-width: 420px;
+            margin-left: auto;
+            margin-right: auto;
+            padding: 18px;
+            border-radius: 12px;
+            background: #fff;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            display: none;
+        }
+        .product-name {
+            font-size: 20px;
+            color: #2980b9;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        .price {
+            font-size: 22px;
+            color: #27ae60;
+            font-weight: bold;
+        }
+        .old-price {
+            text-decoration: line-through;
+            color: #7f8c8d;
+            font-size: 16px;
+            margin-bottom: 4px;
+        }
+        .offer {
+            font-size: 24px;
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        .desc {
+            font-size: 14px;
+            color: #7f8c8d;
+            margin-bottom: 6px;
+        }
+        .error {
+            color: #c0392b;
+            font-weight: bold;
+            font-size: 16px;
+        }
     </style>
 </head>
 <body>
 
     <h2>📱 ماسح أسعار المحل</h2>
+    <div id="status">⏳ جاري تحميل قائمة المنتجات...</div>
     
-    <!-- المكان الذي ستظهر فيه الكاميرا -->
+    <!-- مكان الكاميرا -->
     <div id="reader"></div>
     
-    <!-- المكان الذي ستظهر فيه نتيجة الفحص -->
+    <!-- مكان النتيجة -->
     <div id="result"></div>
 
     <script>
         let products = [];
+        
+        // رابط ملف Google Sheets بصيغة CSV
+        const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQCpR9i8vwj3iwcjDyB3xQjx2iTaD3s1kLjYRbwNQW-IOcrdADwRE4mBGbk96pxKGKLYqfbpjVuDLqI/pub?output=csv";
 
-        // 1. جلب بيانات المنتجات من ملف JSON الذي صنعناه
-        fetch('products.json')
-            .then(response => response.json())
-            .then(data => {
-                products = data;
-            })
-            .catch(error => console.error("خطأ في تحميل المنتجات:", error));
+        // جلب البيانات من Google Sheets
+        Papa.parse(sheetUrl, {
+            download: true,
+            header: true,
+            skipEmptyLines: true,
+            complete: function(results) {
+                products = results.data;
+                const statusDiv = document.getElementById('status');
+                statusDiv.innerText = `✅ تم تحميل ${products.length} منتج بنجاح! الكاميرا جاهزة.`;
+                statusDiv.style.color = "#27ae60";
+                startCamera();
+            },
+            error: function(err) {
+                const statusDiv = document.getElementById('status');
+                statusDiv.innerText = "❌ تعذر تحميل البيانات من جوجل، تأكد من اتصال الإنترنت.";
+                statusDiv.style.color = "#c0392b";
+            }
+        });
 
-        // 2. وظيفة تعمل عند التقاط كود بنجاح
-        function onScanSuccess(decodedText, decodedResult) {
+        // دالة العثور على المنتج ومطابقة الباركود
+        function findProduct(code) {
+            const cleanCode = String(code).trim().replace(/^0+/, ''); // إزالة الأصفار الزائدة للمطابقة المرنة
+            return products.find(p => {
+                const pBarcode = String(p.barcode || p.Barcode || '').trim();
+                const cleanPBarcode = pBarcode.replace(/^0+/, '');
+                return pBarcode === String(code).trim() || (cleanCode && cleanCode === cleanPBarcode);
+            });
+        }
+
+        // عند مسح الكود بنجاح
+        function onScanSuccess(decodedText) {
             const resultDiv = document.getElementById('result');
-            
-            // البحث عن الباركود داخل المنتجات
-            const product = products.find(p => p.barcode === decodedText);
+            const product = findProduct(decodedText);
 
             resultDiv.style.display = 'block';
 
             if (product) {
-                let html = `<div class="product-name">${product.name}</div>`;
-                
-                if (product.has_offer) {
-                    html += `<div class="old-price">السعر الأصلي: ${product.price}</div>`;
-                    html += `<div class="offer">سعر العرض: ${product.offer_price} 🔥</div>`;
+                const name = product.name || product.Produkt || 'منتج بدون اسم';
+                const price = product.price || product.Preis || '0';
+                const offer = product.offer || product.Offer || '';
+                const desc = product.Beschreibung || product.desc || '';
+
+                let html = `<div class="product-name">${name}</div>`;
+                if (desc) {
+                    html += `<div class="desc">${desc}</div>`;
+                }
+
+                if (offer && String(offer).trim() !== "") {
+                    html += `<div class="old-price">السعر الأصلي: ${price} €</div>`;
+                    html += `<div class="offer">سعر العرض: ${offer} € 🔥</div>`;
                 } else {
-                    html += `<div class="price">السعر: ${product.price}</div>`;
+                    html += `<div class="price">السعر: ${price} €</div>`;
                 }
                 
                 resultDiv.innerHTML = html;
             } else {
-                resultDiv.innerHTML = `<div class="error">المنتج غير موجود في النظام (كود: ${decodedText})</div>`;
+                resultDiv.innerHTML = `<div class="error">❌ المنتج غير مسجل بالنظام<br><small style="color:#555;">(كود: ${decodedText})</small></div>`;
             }
         }
 
-        // 3. تشغيل الكاميرا
-        let html5QrcodeScanner = new Html5QrcodeScanner(
-            "reader", 
-            { fps: 10, qrbox: {width: 250, height: 250} }, 
-            /* verbose= */ false
-        );
-        html5QrcodeScanner.render(onScanSuccess);
+        // تشغيل الكاميرا
+        function startCamera() {
+            const html5QrcodeScanner = new Html5QrcodeScanner(
+                "reader", 
+                { 
+                    fps: 10, 
+                    qrbox: { width: 260, height: 200 },
+                    aspectRatio: 1.0
+                }, 
+                false
+            );
+            html5QrcodeScanner.render(onScanSuccess);
+        }
     </script>
 </body>
 </html>
