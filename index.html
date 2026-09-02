@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>كاشير ومحاسبة المحل</title>
-    <!-- مكتبة Quagga2 مخصصة لباركود EAN فقط -->
-    <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
     <!-- مكتبة قراءة CSV -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -68,6 +66,7 @@
             cursor: pointer;
         }
 
+        /* نافذة المعاينة السريعة */
         #camera-wrapper {
             background: #000;
             border-radius: 16px;
@@ -76,15 +75,9 @@
             margin-bottom: 15px;
             display: none;
             position: relative;
-            height: 240px;
+            height: 250px;
         }
-        #interactive.viewport {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-        }
-        #interactive.viewport > video, #interactive.viewport > canvas {
+        #scanner-video {
             width: 100%;
             height: 100%;
             object-fit: cover;
@@ -95,7 +88,7 @@
             left: 50%;
             transform: translate(-50%, -50%);
             width: 80%;
-            height: 50%;
+            height: 55%;
             border: 2px solid #22c55e;
             border-radius: 12px;
             box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.5);
@@ -325,18 +318,21 @@
         <h2>🧾 كاشير ومحاسبة المحل</h2>
         <div id="status">⏳ جاري تحميل بيانات المنتجات...</div>
 
+        <!-- زر فتح الكاميرا -->
         <button id="btn-start" class="btn-open-cam" onclick="openScanner()">
-            <span>📷</span> فتح الكاميرا لمسح EAN
+            <span>📷</span> فتح الكاميرا للمسح
         </button>
 
+        <!-- نافذة المعاينة المباشرة -->
         <div id="camera-wrapper">
-            <div id="interactive" class="viewport"></div>
+            <video id="scanner-video" playsinline muted autoplay></video>
             <div class="scan-target-box">
                 <div class="scan-laser"></div>
             </div>
             <button class="btn-close-cam" onclick="closeScanner()">❌ إلغاء</button>
         </div>
 
+        <!-- خانة الإدخال اليدوي -->
         <div class="manual-input-box">
             <input type="number" id="manual-code" placeholder="أو اكتب رقم الباركود..." onkeydown="if(event.key==='Enter') processManualScan()">
             <button onclick="processManualScan()">إدخال</button>
@@ -417,12 +413,23 @@
         let products = [];
         let cart = [];
         let invoices = JSON.parse(localStorage.getItem('store_invoices') || '[]');
-        let isScannerRunning = false;
+        let mediaStream = null;
+        let scanInterval = null;
         let audioCtx = null;
+        let nativeDetector = null;
 
         const beepSuccess = document.getElementById('beep-success');
         const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQCpR9i8vwj3iwcjDyB3xQjx2iTaD3s1kLjYRbwNQW-IOcrdADwRE4mBGbk96pxKGKLYqfbpjVuDLqI/pub?output=csv";
         const webAppUrl = "https://script.google.com/macros/s/AKfycbxkrlCtQUsFsSYWHGLSqQzo1JizU0q6flEYiGjw1UnuMg4oHU1SVUfUv2PAzFGaKZUD/exec";
+
+        // التحقق من دعم محرك آبل/أندرويد الأصلي EAN-13
+        if ('BarcodeDetector' in window) {
+            try {
+                nativeDetector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'] });
+            } catch (e) {
+                nativeDetector = new BarcodeDetector();
+            }
+        }
 
         function playErrorSound() {
             try {
@@ -492,6 +499,10 @@
                         statusDiv.innerText = "⚠️ لم يتم العثور على منتجات في الجدول.";
                         statusDiv.style.color = "#dc2626";
                     }
+                },
+                error: function() {
+                    document.getElementById('status').innerText = "❌ تعذر الاتصال بجدول المنتجات.";
+                    document.getElementById('status').style.color = "#dc2626";
                 }
             });
         }
@@ -508,84 +519,71 @@
             });
         }
 
-        // تشغيل الكاميرا محصورة بـ EAN التجاري فقط
-        function openScanner() {
+        // تشغيل الكاميرا بالوصول المباشر Hardware
+        async function openScanner() {
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             beepSuccess.play().then(() => { beepSuccess.pause(); beepSuccess.currentTime = 0; }).catch(() => {});
 
+            const video = document.getElementById('scanner-video');
             document.getElementById('camera-wrapper').style.display = 'block';
             document.getElementById('btn-start').style.display = 'none';
 
-            Quagga.init({
-                inputStream: {
-                    name: "Live",
-                    type: "LiveStream",
-                    target: document.querySelector('#interactive'),
-                    constraints: {
-                        facingMode: "environment",
-                        width: { min: 1280, ideal: 1920 },
-                        height: { min: 720, ideal: 1080 }
+            try {
+                mediaStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: { ideal: "environment" },
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
                     },
-                    area: {
-                        top: "25%",
-                        right: "10%",
-                        left: "10%",
-                        bottom: "25%"
-                    }
-                },
-                locator: {
-                    patchSize: "large",
-                    halfSample: false
-                },
-                numOfWorkers: 2,
-                frequency: 10,
-                decoder: {
-                    // حصر القارئ بباركود EAN التجاري فقط لمنع أي خربطة
-                    readers: [
-                        "ean_reader",
-                        "ean_8_reader"
-                    ]
-                }
-            }, function(err) {
-                if (err) {
-                    alert("تعذر تشغيل الكاميرا، يرجى التحقق من الأذونات.");
-                    closeScanner();
-                    return;
-                }
-                Quagga.start();
-                isScannerRunning = true;
-            });
+                    audio: false
+                });
 
-            Quagga.onDetected(onBarcodeDetected);
+                video.srcObject = mediaStream;
+                await video.play();
+
+                // حلقة المسح الفوري العتادية
+                startNativeDetection(video);
+
+            } catch (err) {
+                console.error(err);
+                alert("تعذر فتح الكاميرا، يرجى التأكد من السماح بالصلاحيات.");
+                closeScanner();
+            }
+        }
+
+        function startNativeDetection(video) {
+            if (nativeDetector) {
+                scanInterval = setInterval(async () => {
+                    if (video.readyState >= 2) {
+                        try {
+                            const barcodes = await nativeDetector.detect(video);
+                            if (barcodes.length > 0) {
+                                const detectedCode = barcodes[0].rawValue;
+                                if (detectedCode) {
+                                    closeScanner();
+                                    handleScanResult(detectedCode);
+                                }
+                            }
+                        } catch (e) {}
+                    }
+                }, 80); // مسح سريع جداً كل 80 مللي ثانية
+            } else {
+                // بديل للمتصفحات القديمة
+                document.getElementById('status').innerText = "⚠️ يرجى استخدام متصفح سفاري المحدث";
+            }
         }
 
         function closeScanner() {
-            if (isScannerRunning) {
-                Quagga.stop();
-                Quagga.offDetected(onBarcodeDetected);
-                isScannerRunning = false;
+            if (scanInterval) {
+                clearInterval(scanInterval);
+                scanInterval = null;
+            }
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
             }
             document.getElementById('camera-wrapper').style.display = 'none';
             document.getElementById('btn-start').style.display = 'flex';
-        }
-
-        function onBarcodeDetected(result) {
-            if (result && result.codeResult && result.codeResult.code) {
-                // التأكد من دقة القراءة
-                const errors = result.codeResult.decodedCodes
-                    .filter(x => x.error !== undefined)
-                    .map(x => x.error);
-                const avgError = errors.reduce((sum, val) => sum + val, 0) / (errors.length || 1);
-
-                // تجاهل أي قراءة غير نقية
-                if (avgError > 0.15) {
-                    return;
-                }
-
-                const code = result.codeResult.code;
-                closeScanner();
-                handleScanResult(code);
-            }
         }
 
         function handleScanResult(decodedText) {
