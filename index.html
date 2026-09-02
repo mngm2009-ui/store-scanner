@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>كاشير ومحاسبة المحل</title>
-    <!-- مكتبة الكاميرا ومسح الباركود -->
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <!-- مكتبة الكاميرا الاحترافية Zxing -->
+    <script type="text/javascript" src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
     <!-- مكتبة قراءة CSV -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -42,7 +42,7 @@
         }
         .btn-open-cam:active { transform: scale(0.98); background: #1d4ed8; }
 
-        /* خانة الإدخال اليدوي كبديل فوري */
+        /* خانة الإدخال اليدوي */
         .manual-input-box {
             display: flex;
             gap: 8px;
@@ -58,9 +58,7 @@
             text-align: center;
             outline: none;
         }
-        .manual-input-box input:focus {
-            border-color: #2563eb;
-        }
+        .manual-input-box input:focus { border-color: #2563eb; }
         .manual-input-box button {
             background: #0f172a;
             color: white;
@@ -78,8 +76,20 @@
             box-shadow: 0 8px 24px rgba(0,0,0,0.15);
             margin-bottom: 15px;
             display: none;
+            position: relative;
         }
-        #reader { width: 100%; min-height: 260px; }
+        #video-preview { width: 100%; object-fit: cover; border-radius: 16px; }
+
+        /* ليزر المسح الوهمي لتوجيه الكاميرا */
+        .scan-line {
+            position: absolute;
+            top: 50%;
+            left: 10%;
+            width: 80%;
+            height: 2px;
+            background: rgba(220, 38, 38, 0.8);
+            box-shadow: 0 0 10px red;
+        }
 
         .btn-close-cam {
             background: #ef4444;
@@ -94,7 +104,6 @@
             display: block;
         }
 
-        /* كرت آخر نتيجة فحص */
         #last-scanned {
             border-radius: 14px;
             padding: 16px;
@@ -103,15 +112,8 @@
             display: none;
             text-align: right;
         }
-        .success-box {
-            background: #ffffff;
-            border-right: 6px solid #16a34a;
-        }
-        .error-box {
-            background: #fef2f2;
-            border: 2px solid #f87171;
-            border-right: 6px solid #dc2626;
-        }
+        .success-box { background: #ffffff; border-right: 6px solid #16a34a; }
+        .error-box { background: #fef2f2; border: 2px solid #f87171; border-right: 6px solid #dc2626; }
 
         .brand-badge {
             display: inline-block;
@@ -302,18 +304,19 @@
 
         <!-- زر فتح الكاميرا -->
         <button id="btn-start" class="btn-open-cam" onclick="openScanner()">
-            <span>📷</span> فتح الكاميرا لمسح كود
+            <span>📷</span> مسح سريع عبر الكاميرا
         </button>
 
         <!-- نافذة الكاميرا -->
         <div id="camera-wrapper">
-            <div id="reader"></div>
-            <button class="btn-close-cam" onclick="closeScanner()">❌ إلغاء وإغلاق الكاميرا</button>
+            <video id="video-preview"></video>
+            <div class="scan-line"></div>
+            <button class="btn-close-cam" onclick="closeScanner()">❌ إلغاء</button>
         </div>
 
         <!-- خانة البحث أو إدخال الكود يدوياً -->
         <div class="manual-input-box">
-            <input type="text" id="manual-code" placeholder="أو أدخل رقم الباركود يدوياً..." onkeydown="if(event.key==='Enter') processManualScan()">
+            <input type="number" id="manual-code" placeholder="رقم الباركود يدوياً..." onkeydown="if(event.key==='Enter') processManualScan()">
             <button onclick="processManualScan()">إدخال</button>
         </div>
 
@@ -399,29 +402,24 @@
         let products = [];
         let cart = [];
         let invoices = JSON.parse(localStorage.getItem('store_invoices') || '[]');
-        let html5QrCode = null;
-        let isCameraRunning = false;
+        let codeReader = null;
         let audioCtx = null;
 
         const beepSuccess = document.getElementById('beep-success');
         const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQCpR9i8vwj3iwcjDyB3xQjx2iTaD3s1kLjYRbwNQW-IOcrdADwRE4mBGbk96pxKGKLYqfbpjVuDLqI/pub?output=csv";
         const webAppUrl = "https://script.google.com/macros/s/AKfycbxkrlCtQUsFsSYWHGLSqQzo1JizU0q6flEYiGjw1UnuMg4oHU1SVUfUv2PAzFGaKZUD/exec";
 
-        // نغمة صوتية مخصصة عند حدوث خطأ أو عدم وجود المنتج
         function playErrorSound() {
             try {
                 if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 const now = audioCtx.currentTime;
-
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
                 osc.type = "sawtooth";
                 osc.frequency.setValueAtTime(220, now);
                 osc.frequency.setValueAtTime(140, now + 0.15);
-
                 gain.gain.setValueAtTime(0.3, now);
                 gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
-
                 osc.connect(gain);
                 gain.connect(audioCtx.destination);
                 osc.start(now);
@@ -457,7 +455,6 @@
             const offer = cleanString(item.Offer || item.offer || item['العرض'] || item['سعر العرض']);
             const desc = cleanString(item.Beschreibung || item.beschreibung || item.desc || item.Description || item['الوصف'] || item['الوزن']);
             const brand = extractBrand(item, rawName);
-            
             return { barcode, name: rawName, price, offer, desc, brand };
         }
 
@@ -482,20 +479,17 @@
                     }
                 },
                 error: function() {
-                    const statusDiv = document.getElementById('status');
-                    statusDiv.innerText = "❌ تعذر الاتصال بجدول المنتجات.";
-                    statusDiv.style.color = "#dc2626";
+                    document.getElementById('status').innerText = "❌ تعذر الاتصال بجدول المنتجات.";
+                    document.getElementById('status').style.color = "#dc2626";
                 }
             });
         }
         loadProductsFromGoogle();
         renderInvoicesUI();
 
-        // مطابقة ذكية للباركود بمرونة كاملة
         function findProduct(code) {
             const rawScan = cleanString(code);
             const noZerosScan = rawScan.replace(/^0+/, '');
-
             return products.find(p => {
                 const pBarcode = cleanString(p.barcode);
                 const pNoZeros = pBarcode.replace(/^0+/, '');
@@ -503,7 +497,7 @@
             });
         }
 
-        // فتح الكاميرا مجهزة بتقنية Apple WebKit BarcodeDetector
+        // تشغيل مكتبة ZXing الاحترافية للمسح الفوري
         function openScanner() {
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             beepSuccess.play().then(() => { beepSuccess.pause(); beepSuccess.currentTime = 0; }).catch(() => {});
@@ -511,44 +505,26 @@
             document.getElementById('camera-wrapper').style.display = 'block';
             document.getElementById('btn-start').style.display = 'none';
 
-            if (!html5QrCode) {
-                // تفعيل معالج الآيفون الداخلي فائق السرعة
-                html5QrCode = new Html5Qrcode("reader", {
-                    experimentalFeatures: {
-                        useBarCodeDetectorIfSupported: true
-                    },
-                    verbose: false
-                });
+            if (!codeReader) {
+                codeReader = new ZXing.BrowserMultiFormatReader();
             }
 
-            // إعدادات مصممة للآيفون وسفاري بدون تشويش
-            const config = { 
-                fps: 15,
-                videoConstraints: {
-                    facingMode: "environment"
+            codeReader.decodeFromVideoDevice(null, 'video-preview', (result, err) => {
+                if (result) {
+                    onScanSuccess(result.getText());
                 }
-            };
-
-            html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
-                .then(() => { isCameraRunning = true; })
-                .catch(err => {
-                    console.error("Camera start error:", err);
-                    alert("يرجى إعطاء الإذن للكاميرا في إعدادات Safari.");
-                    closeScanner();
-                });
+            }).catch(err => {
+                alert("تعذر فتح الكاميرا، يرجى السماح بصلاحيات الكاميرا.");
+                closeScanner();
+            });
         }
 
         function closeScanner() {
-            if (isCameraRunning && html5QrCode) {
-                html5QrCode.stop().then(() => {
-                    isCameraRunning = false;
-                    document.getElementById('camera-wrapper').style.display = 'none';
-                    document.getElementById('btn-start').style.display = 'flex';
-                }).catch(err => console.error(err));
-            } else {
-                document.getElementById('camera-wrapper').style.display = 'none';
-                document.getElementById('btn-start').style.display = 'flex';
+            if (codeReader) {
+                codeReader.reset();
             }
+            document.getElementById('camera-wrapper').style.display = 'none';
+            document.getElementById('btn-start').style.display = 'flex';
         }
 
         function handleScanResult(decodedText) {
@@ -593,7 +569,6 @@
             } else {
                 playErrorSound();
                 lastScannedDiv.className = 'error-box';
-
                 lastScannedDiv.innerHTML = `
                     <div style="color: #dc2626; font-weight: 900; font-size: 19px; margin-bottom: 6px;">
                         ❌ هذا المنتج غير موجود في الجدول!
@@ -616,13 +591,13 @@
             handleScanResult(decodedText);
         }
 
-        // إدخال يدوي
         function processManualScan() {
             const input = document.getElementById('manual-code');
             const code = input.value.trim();
             if (code) {
                 handleScanResult(code);
                 input.value = '';
+                input.blur();
             }
         }
 
