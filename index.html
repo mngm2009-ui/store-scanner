@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>كاشير ومحاسبة المحل</title>
+    <title>كاشير وماسح أسعار المحل</title>
     <!-- مكتبة الكاميرا ومسح الباركود -->
-    <script src="https://unpkg.com/html5-qrcode"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <!-- مكتبة قراءة CSV -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -50,34 +50,40 @@
             margin-bottom: 15px;
             display: none;
         }
-        #reader { width: 100%; }
+        #reader { width: 100%; min-height: 280px; }
 
         .btn-close-cam {
             background: #ef4444;
             color: #fff;
             border: none;
-            padding: 10px 20px;
+            padding: 12px 20px;
             font-size: 16px;
             font-weight: bold;
             border-radius: 8px;
-            margin: 10px auto;
+            margin: 12px auto;
             cursor: pointer;
             display: block;
         }
 
-        /* كرت آخر منتج ممسوح مع شارة الماركة */
+        /* كرت آخر نتيجة فحص */
         #last-scanned {
-            background: #ffffff;
             border-radius: 14px;
             padding: 16px;
             margin-bottom: 15px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.06);
             display: none;
-            border-right: 6px solid #2563eb;
             text-align: right;
         }
+        .success-box {
+            background: #ffffff;
+            border-right: 6px solid #16a34a;
+        }
+        .error-box {
+            background: #fef2f2;
+            border: 2px solid #f87171;
+            border-right: 6px solid #dc2626;
+        }
 
-        /* شارة الماركة (Brand Badge) */
         .brand-badge {
             display: inline-block;
             background: #e0e7ff;
@@ -263,7 +269,7 @@
 
     <div class="container">
         <h2>🧾 كاشير ومحاسبة المحل</h2>
-        <div id="status">⏳ جاري تحميل البيانات...</div>
+        <div id="status">⏳ جاري تحميل بيانات المنتجات...</div>
 
         <!-- زر فتح الكاميرا -->
         <button id="btn-start" class="btn-open-cam" onclick="openScanner()">
@@ -275,7 +281,7 @@
             <button class="btn-close-cam" onclick="closeScanner()">❌ إلغاء وإغلاق الكاميرا</button>
         </div>
 
-        <!-- كرت آخر منتج ممسوح مع الماركة -->
+        <!-- صندوق النتيجة بعد المسح (سواء نجاح أو خطأ) -->
         <div id="last-scanned"></div>
 
         <!-- المجموع الكلي -->
@@ -349,7 +355,8 @@
         <div id="upload-toast"></div>
     </div>
 
-    <audio id="beep-sound" preload="auto">
+    <!-- صوت النجاح (نقر خفيف) -->
+    <audio id="beep-success" preload="auto">
         <source src="https://assets.mixkit.co/active_storage/sfx/2578/2578-preview.mp3" type="audio/mpeg">
     </audio>
 
@@ -359,18 +366,46 @@
         let invoices = JSON.parse(localStorage.getItem('store_invoices') || '[]');
         let html5QrCode = null;
         let isCameraRunning = false;
-        const beepAudio = document.getElementById('beep-sound');
+        let audioCtx = null;
 
+        const beepSuccess = document.getElementById('beep-success');
         const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQCpR9i8vwj3iwcjDyB3xQjx2iTaD3s1kLjYRbwNQW-IOcrdADwRE4mBGbk96pxKGKLYqfbpjVuDLqI/pub?output=csv";
         const webAppUrl = "https://script.google.com/macros/s/AKfycbxkrlCtQUsFsSYWHGLSqQzo1JizU0q6flEYiGjw1UnuMg4oHU1SVUfUv2PAzFGaKZUD/exec";
 
+        // نغمة صوتية مخصصة عند حدوث خطأ أو عدم وجود المنتج
+        function playErrorSound() {
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const now = audioCtx.currentTime;
+
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = "sawtooth";
+                osc.frequency.setValueAtTime(220, now); // تردد منخفض للخطأ
+                osc.frequency.setValueAtTime(140, now + 0.15);
+
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.35);
+            } catch (e) {}
+        }
+
+        function playSuccessSound() {
+            try {
+                beepSuccess.currentTime = 0;
+                beepSuccess.volume = 0.5;
+                beepSuccess.play().catch(e => {});
+            } catch (e) {}
+        }
+
         function cleanString(val) { return val ? String(val).trim() : ""; }
 
-        // استخراج الماركة بذكاء
         function extractBrand(item, productName) {
             let brand = cleanString(item.Brand || item.brand || item.Marke || item.marke || item.Kategorie || item.kategorie || item['الماركة'] || item['الشركة']);
-            
-            // إذا لم يكن هناك عمود للماركة، استخرج ما بين القوسين من اسم المنتج
             if (!brand && productName) {
                 const match = productName.match(/\((.*?)\)/);
                 if (match && match[1]) {
@@ -406,24 +441,26 @@
                     if (products.length > 0) {
                         statusDiv.innerText = `✅ النظام جاهز (${products.length} منتج مسجل)`;
                         statusDiv.style.color = "#16a34a";
+                    } else {
+                        statusDiv.innerText = "⚠️ لم يتم العثور على منتجات في الجدول.";
+                        statusDiv.style.color = "#dc2626";
                     }
+                },
+                error: function() {
+                    const statusDiv = document.getElementById('status');
+                    statusDiv.innerText = "❌ تعذر الاتصال بجدول المنتجات.";
+                    statusDiv.style.color = "#dc2626";
                 }
             });
         }
         loadProductsFromGoogle();
         renderInvoicesUI();
 
-        function playBeepSound() {
-            try {
-                beepAudio.currentTime = 0;
-                beepAudio.volume = 0.5;
-                beepAudio.play().catch(e => {});
-            } catch (e) {}
-        }
-
+        // مطابقة ذكية للباركود
         function findProduct(code) {
             const rawScan = cleanString(code);
             const noZerosScan = rawScan.replace(/^0+/, '');
+
             return products.find(p => {
                 const pBarcode = cleanString(p.barcode);
                 const pNoZeros = pBarcode.replace(/^0+/, '');
@@ -431,16 +468,44 @@
             });
         }
 
+        // فتح الكاميرا مع ضبط صيغ الباركود التجارية
         function openScanner() {
-            beepAudio.play().then(() => { beepAudio.pause(); beepAudio.currentTime = 0; }).catch(() => {});
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            beepSuccess.play().then(() => { beepSuccess.pause(); beepSuccess.currentTime = 0; }).catch(() => {});
+
             document.getElementById('camera-wrapper').style.display = 'block';
             document.getElementById('btn-start').style.display = 'none';
 
-            if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
-            const config = { fps: 15, qrbox: { width: 280, height: 180 }, aspectRatio: 1.0 };
+            if (!html5QrCode) {
+                // تفعيل جميع صيغ الباركود التجارية
+                const formatsToSupport = [
+                    Html5QrcodeSupportedFormats.EAN_13,
+                    Html5QrcodeSupportedFormats.EAN_8,
+                    Html5QrcodeSupportedFormats.UPC_A,
+                    Html5QrcodeSupportedFormats.UPC_E,
+                    Html5QrcodeSupportedFormats.CODE_128,
+                    Html5QrcodeSupportedFormats.CODE_39,
+                    Html5QrcodeSupportedFormats.QR_CODE
+                ];
+                html5QrCode = new Html5Qrcode("reader", { formatsToSupport: formatsToSupport, verbose: false });
+            }
+
+            const config = { 
+                fps: 20, 
+                qrbox: (viewfinderWidth, viewfinderHeight) => {
+                    // نافذة مسح مستطيلة وواسعة لتلائم خطوط الباركود بسهولة
+                    return { width: Math.floor(viewfinderWidth * 0.85), height: Math.floor(viewfinderHeight * 0.5) };
+                },
+                aspectRatio: 1.333334
+            };
+
             html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
                 .then(() => { isCameraRunning = true; })
-                .catch(() => { alert("يرجى تفعيل صلاحية الكاميرا"); closeScanner(); });
+                .catch(err => {
+                    console.error(err);
+                    alert("يرجى التأكد من السماح بصلاحية الكاميرا في المتصفح.");
+                    closeScanner();
+                });
         }
 
         function closeScanner() {
@@ -457,7 +522,7 @@
         }
 
         function onScanSuccess(decodedText) {
-            playBeepSound();
+            // إيقاف الكاميرا فور التقاط أي كود
             closeScanner();
 
             const product = findProduct(decodedText);
@@ -465,6 +530,10 @@
             lastScannedDiv.style.display = 'block';
 
             if (product) {
+                // حالة النجاح
+                playSuccessSound();
+                lastScannedDiv.className = 'success-box';
+
                 const name = product.name || 'منتج';
                 const rawPrice = cleanString(product.price || '0').replace(',', '.');
                 const rawOffer = cleanString(product.offer || '').replace(',', '.');
@@ -483,21 +552,36 @@
                     originalPrice: parseFloat(rawPrice)
                 });
 
-                const brandHtml = brand ? `<div class="brand-badge">🏷️ الماركة: ${brand}</div>` : '';
+                const brandHtml = brand ? `<div class="brand-badge">🏷️ ${brand}</div>` : '';
 
                 lastScannedDiv.innerHTML = `
+                    <div style="color: #16a34a; font-weight: bold; font-size: 15px; margin-bottom: 6px;">✅ تم تسجيل المنتج بنجاح:</div>
                     ${brandHtml}
-                    <div style="font-size: 18px; font-weight: 800; color: #0f172a; line-height: 1.3;">${name}</div>
-                    <div style="font-size: 15px; color: #64748b; margin-top: 4px;">${desc ? desc : ''}</div>
-                    <div style="font-size: 22px; color: ${hasOffer ? '#dc2626' : '#16a34a'}; font-weight: 900; margin-top: 6px;">
-                        ${finalPrice.toFixed(2)} € ${hasOffer ? '<span style="font-size:14px; background:#fee2e2; padding:2px 8px; border-radius:50px;">(عرض 🔥)</span>' : ''}
+                    <div style="font-size: 19px; font-weight: 800; color: #0f172a; line-height: 1.3;">${name}</div>
+                    <div style="font-size: 14px; color: #64748b; margin-top: 3px;">${desc}</div>
+                    <div style="font-size: 24px; color: ${hasOffer ? '#dc2626' : '#16a34a'}; font-weight: 900; margin-top: 6px;">
+                        ${finalPrice.toFixed(2)} € ${hasOffer ? '<span style="font-size:14px; background:#fee2e2; padding:3px 10px; border-radius:50px;">(عرض 🔥)</span>' : ''}
                     </div>
                 `;
                 updateCartUI();
             } else {
+                // حالة الخطأ: المنتج غير موجود بالجدول
+                playErrorSound();
+                lastScannedDiv.className = 'error-box';
+
                 lastScannedDiv.innerHTML = `
-                    <div style="color: #dc2626; font-weight: bold; font-size: 16px;">❌ المنتج غير موجود بالجدول!</div>
-                    <div style="font-size: 14px; color: #64748b;">(الكود الممسوح: ${decodedText})</div>
+                    <div style="color: #dc2626; font-weight: 900; font-size: 20px; margin-bottom: 6px;">
+                        ❌ هذا المنتج غير موجود في الجدول!
+                    </div>
+                    <div style="font-size: 15px; color: #1e293b; font-weight: 600;">
+                        كود الباركود: <span style="font-family: monospace; background: #e2e8f0; padding: 2px 8px; border-radius: 6px;">${decodedText}</span>
+                    </div>
+                    <div style="font-size: 13px; color: #64748b; margin-top: 6px;">
+                        تأكد من إضافة المنتج وسعره إلى Google Sheets أولاً.
+                    </div>
+                    <button onclick="openScanner()" style="margin-top: 12px; width: 100%; background: #dc2626; color: white; border: none; padding: 12px; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer;">
+                        🔄 إعادة المحاولة ومسح كود آخر
+                    </button>
                 `;
             }
         }
