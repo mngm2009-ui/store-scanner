@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>كاشير وماسح أسعار المحل</title>
+    <title>كاشير ومحاسبة المحل</title>
     <!-- مكتبة الكاميرا ومسح الباركود -->
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <!-- مكتبة قراءة CSV -->
@@ -34,13 +34,42 @@
             border-radius: 16px;
             cursor: pointer;
             box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 10px;
         }
         .btn-open-cam:active { transform: scale(0.98); background: #1d4ed8; }
+
+        /* خانة الإدخال اليدوي كبديل فوري */
+        .manual-input-box {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        .manual-input-box input {
+            flex: 1;
+            padding: 12px 14px;
+            border: 2px solid #cbd5e1;
+            border-radius: 12px;
+            font-size: 16px;
+            font-family: monospace;
+            text-align: center;
+            outline: none;
+        }
+        .manual-input-box input:focus {
+            border-color: #2563eb;
+        }
+        .manual-input-box button {
+            background: #0f172a;
+            color: white;
+            border: none;
+            padding: 12px 18px;
+            border-radius: 12px;
+            font-weight: bold;
+            cursor: pointer;
+        }
 
         #camera-wrapper {
             background: #000;
@@ -50,7 +79,7 @@
             margin-bottom: 15px;
             display: none;
         }
-        #reader { width: 100%; min-height: 280px; }
+        #reader { width: 100%; min-height: 260px; }
 
         .btn-close-cam {
             background: #ef4444;
@@ -276,9 +305,16 @@
             <span>📷</span> فتح الكاميرا لمسح كود
         </button>
 
+        <!-- نافذة الكاميرا -->
         <div id="camera-wrapper">
             <div id="reader"></div>
             <button class="btn-close-cam" onclick="closeScanner()">❌ إلغاء وإغلاق الكاميرا</button>
+        </div>
+
+        <!-- خانة البحث أو إدخال الكود يدوياً -->
+        <div class="manual-input-box">
+            <input type="text" id="manual-code" placeholder="أو أدخل رقم الباركود يدوياً..." onkeydown="if(event.key==='Enter') processManualScan()">
+            <button onclick="processManualScan()">إدخال</button>
         </div>
 
         <!-- صندوق النتيجة بعد المسح (سواء نجاح أو خطأ) -->
@@ -355,7 +391,6 @@
         <div id="upload-toast"></div>
     </div>
 
-    <!-- صوت النجاح (نقر خفيف) -->
     <audio id="beep-success" preload="auto">
         <source src="https://assets.mixkit.co/active_storage/sfx/2578/2578-preview.mp3" type="audio/mpeg">
     </audio>
@@ -381,7 +416,7 @@
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
                 osc.type = "sawtooth";
-                osc.frequency.setValueAtTime(220, now); // تردد منخفض للخطأ
+                osc.frequency.setValueAtTime(220, now);
                 osc.frequency.setValueAtTime(140, now + 0.15);
 
                 gain.gain.setValueAtTime(0.3, now);
@@ -456,7 +491,7 @@
         loadProductsFromGoogle();
         renderInvoicesUI();
 
-        // مطابقة ذكية للباركود
+        // مطابقة ذكية للباركود بمرونة كاملة
         function findProduct(code) {
             const rawScan = cleanString(code);
             const noZerosScan = rawScan.replace(/^0+/, '');
@@ -468,7 +503,7 @@
             });
         }
 
-        // فتح الكاميرا مع ضبط صيغ الباركود التجارية
+        // فتح الكاميرا مجهزة بتقنية Apple WebKit BarcodeDetector
         function openScanner() {
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             beepSuccess.play().then(() => { beepSuccess.pause(); beepSuccess.currentTime = 0; }).catch(() => {});
@@ -477,33 +512,28 @@
             document.getElementById('btn-start').style.display = 'none';
 
             if (!html5QrCode) {
-                // تفعيل جميع صيغ الباركود التجارية
-                const formatsToSupport = [
-                    Html5QrcodeSupportedFormats.EAN_13,
-                    Html5QrcodeSupportedFormats.EAN_8,
-                    Html5QrcodeSupportedFormats.UPC_A,
-                    Html5QrcodeSupportedFormats.UPC_E,
-                    Html5QrcodeSupportedFormats.CODE_128,
-                    Html5QrcodeSupportedFormats.CODE_39,
-                    Html5QrcodeSupportedFormats.QR_CODE
-                ];
-                html5QrCode = new Html5Qrcode("reader", { formatsToSupport: formatsToSupport, verbose: false });
+                // تفعيل معالج الآيفون الداخلي فائق السرعة
+                html5QrCode = new Html5Qrcode("reader", {
+                    experimentalFeatures: {
+                        useBarCodeDetectorIfSupported: true
+                    },
+                    verbose: false
+                });
             }
 
+            // إعدادات مصممة للآيفون وسفاري بدون تشويش
             const config = { 
-                fps: 20, 
-                qrbox: (viewfinderWidth, viewfinderHeight) => {
-                    // نافذة مسح مستطيلة وواسعة لتلائم خطوط الباركود بسهولة
-                    return { width: Math.floor(viewfinderWidth * 0.85), height: Math.floor(viewfinderHeight * 0.5) };
-                },
-                aspectRatio: 1.333334
+                fps: 15,
+                videoConstraints: {
+                    facingMode: "environment"
+                }
             };
 
             html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
                 .then(() => { isCameraRunning = true; })
                 .catch(err => {
-                    console.error(err);
-                    alert("يرجى التأكد من السماح بصلاحية الكاميرا في المتصفح.");
+                    console.error("Camera start error:", err);
+                    alert("يرجى إعطاء الإذن للكاميرا في إعدادات Safari.");
                     closeScanner();
                 });
         }
@@ -521,16 +551,12 @@
             }
         }
 
-        function onScanSuccess(decodedText) {
-            // إيقاف الكاميرا فور التقاط أي كود
-            closeScanner();
-
+        function handleScanResult(decodedText) {
             const product = findProduct(decodedText);
             const lastScannedDiv = document.getElementById('last-scanned');
             lastScannedDiv.style.display = 'block';
 
             if (product) {
-                // حالة النجاح
                 playSuccessSound();
                 lastScannedDiv.className = 'success-box';
 
@@ -565,24 +591,38 @@
                 `;
                 updateCartUI();
             } else {
-                // حالة الخطأ: المنتج غير موجود بالجدول
                 playErrorSound();
                 lastScannedDiv.className = 'error-box';
 
                 lastScannedDiv.innerHTML = `
-                    <div style="color: #dc2626; font-weight: 900; font-size: 20px; margin-bottom: 6px;">
+                    <div style="color: #dc2626; font-weight: 900; font-size: 19px; margin-bottom: 6px;">
                         ❌ هذا المنتج غير موجود في الجدول!
                     </div>
                     <div style="font-size: 15px; color: #1e293b; font-weight: 600;">
-                        كود الباركود: <span style="font-family: monospace; background: #e2e8f0; padding: 2px 8px; border-radius: 6px;">${decodedText}</span>
+                        كود الباركود: <span style="font-family: monospace; background: #e2e8f0; padding: 3px 8px; border-radius: 6px;">${decodedText}</span>
                     </div>
                     <div style="font-size: 13px; color: #64748b; margin-top: 6px;">
-                        تأكد من إضافة المنتج وسعره إلى Google Sheets أولاً.
+                        تأكد من إضافته إلى جدول Google Sheets.
                     </div>
                     <button onclick="openScanner()" style="margin-top: 12px; width: 100%; background: #dc2626; color: white; border: none; padding: 12px; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer;">
-                        🔄 إعادة المحاولة ومسح كود آخر
+                        🔄 مسح كود آخر
                     </button>
                 `;
+            }
+        }
+
+        function onScanSuccess(decodedText) {
+            closeScanner();
+            handleScanResult(decodedText);
+        }
+
+        // إدخال يدوي
+        function processManualScan() {
+            const input = document.getElementById('manual-code');
+            const code = input.value.trim();
+            if (code) {
+                handleScanResult(code);
+                input.value = '';
             }
         }
 
