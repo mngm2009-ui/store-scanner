@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>كاشير ومحاسبة المحل</title>
+    <!-- مكتبة الكاميرا المستقرة والمخصصة -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <!-- مكتبة قراءة CSV -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -66,7 +68,6 @@
             cursor: pointer;
         }
 
-        /* نافذة المعاينة السريعة */
         #camera-wrapper {
             background: #000;
             border-radius: 16px;
@@ -75,49 +76,20 @@
             margin-bottom: 15px;
             display: none;
             position: relative;
-            height: 250px;
         }
-        #scanner-video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        .scan-target-box {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 80%;
-            height: 55%;
-            border: 2px solid #22c55e;
-            border-radius: 12px;
-            box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.5);
-            pointer-events: none;
-        }
-        .scan-laser {
-            position: absolute;
-            top: 50%;
-            left: 5%;
-            width: 90%;
-            height: 2px;
-            background: #ef4444;
-            box-shadow: 0 0 8px #ef4444;
-        }
+        #reader { width: 100%; min-height: 280px; }
 
         .btn-close-cam {
-            position: absolute;
-            bottom: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(239, 68, 68, 0.9);
+            background: #ef4444;
             color: #fff;
             border: none;
-            padding: 8px 18px;
-            font-size: 14px;
+            padding: 12px 20px;
+            font-size: 16px;
             font-weight: bold;
-            border-radius: 20px;
+            border-radius: 8px;
+            margin: 12px auto;
             cursor: pointer;
-            z-index: 10;
+            display: block;
         }
 
         #last-scanned {
@@ -320,19 +292,15 @@
 
         <!-- زر فتح الكاميرا -->
         <button id="btn-start" class="btn-open-cam" onclick="openScanner()">
-            <span>📷</span> فتح الكاميرا للمسح
+            <span>📷</span> مسح الباركود بالكاميرا
         </button>
 
-        <!-- نافذة المعاينة المباشرة -->
         <div id="camera-wrapper">
-            <video id="scanner-video" playsinline muted autoplay></video>
-            <div class="scan-target-box">
-                <div class="scan-laser"></div>
-            </div>
+            <div id="reader"></div>
             <button class="btn-close-cam" onclick="closeScanner()">❌ إلغاء</button>
         </div>
 
-        <!-- خانة الإدخال اليدوي -->
+        <!-- إدخال يدوي -->
         <div class="manual-input-box">
             <input type="number" id="manual-code" placeholder="أو اكتب رقم الباركود..." onkeydown="if(event.key==='Enter') processManualScan()">
             <button onclick="processManualScan()">إدخال</button>
@@ -370,6 +338,7 @@
         </div>
     </div>
 
+    <!-- نافذة منبثقة للطباعة -->
     <div id="invoice-modal">
         <div class="modal-content" id="printable-area">
             <div style="text-align:center; border-bottom: 2px dashed #000; padding-bottom: 10px;">
@@ -397,6 +366,7 @@
         </div>
     </div>
 
+    <!-- زر الزاوية للإدارة -->
     <div class="admin-corner">
         <label class="admin-btn" for="file-input">
             ⚙️ 📂 تحديث ملف CSV
@@ -405,6 +375,7 @@
         <div id="upload-toast"></div>
     </div>
 
+    <!-- أصوات التنبيه -->
     <audio id="beep-success" preload="auto">
         <source src="https://assets.mixkit.co/active_storage/sfx/2578/2578-preview.mp3" type="audio/mpeg">
     </audio>
@@ -413,23 +384,13 @@
         let products = [];
         let cart = [];
         let invoices = JSON.parse(localStorage.getItem('store_invoices') || '[]');
-        let mediaStream = null;
-        let scanInterval = null;
+        let html5QrCode = null;
+        let isCameraRunning = false;
         let audioCtx = null;
-        let nativeDetector = null;
 
         const beepSuccess = document.getElementById('beep-success');
         const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQCpR9i8vwj3iwcjDyB3xQjx2iTaD3s1kLjYRbwNQW-IOcrdADwRE4mBGbk96pxKGKLYqfbpjVuDLqI/pub?output=csv";
         const webAppUrl = "https://script.google.com/macros/s/AKfycbxkrlCtQUsFsSYWHGLSqQzo1JizU0q6flEYiGjw1UnuMg4oHU1SVUfUv2PAzFGaKZUD/exec";
-
-        // التحقق من دعم محرك آبل/أندرويد الأصلي EAN-13
-        if ('BarcodeDetector' in window) {
-            try {
-                nativeDetector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'] });
-            } catch (e) {
-                nativeDetector = new BarcodeDetector();
-            }
-        }
 
         function playErrorSound() {
             try {
@@ -495,14 +456,7 @@
                     if (products.length > 0) {
                         statusDiv.innerText = `✅ النظام جاهز (${products.length} منتج مسجل)`;
                         statusDiv.style.color = "#16a34a";
-                    } else {
-                        statusDiv.innerText = "⚠️ لم يتم العثور على منتجات في الجدول.";
-                        statusDiv.style.color = "#dc2626";
                     }
-                },
-                error: function() {
-                    document.getElementById('status').innerText = "❌ تعذر الاتصال بجدول المنتجات.";
-                    document.getElementById('status').style.color = "#dc2626";
                 }
             });
         }
@@ -519,71 +473,50 @@
             });
         }
 
-        // تشغيل الكاميرا بالوصول المباشر Hardware
-        async function openScanner() {
+        function openScanner() {
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             beepSuccess.play().then(() => { beepSuccess.pause(); beepSuccess.currentTime = 0; }).catch(() => {});
 
-            const video = document.getElementById('scanner-video');
             document.getElementById('camera-wrapper').style.display = 'block';
             document.getElementById('btn-start').style.display = 'none';
 
-            try {
-                mediaStream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: { ideal: "environment" },
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 }
-                    },
-                    audio: false
+            if (!html5QrCode) {
+                // ضبط المكتبة لقراءة باركود المنتجات التجارية بصرامة
+                html5QrCode = new Html5Qrcode("reader", {
+                    formatsToSupport: [ 
+                        Html5QrcodeSupportedFormats.EAN_13, 
+                        Html5QrcodeSupportedFormats.EAN_8, 
+                        Html5QrcodeSupportedFormats.UPC_A
+                    ]
                 });
-
-                video.srcObject = mediaStream;
-                await video.play();
-
-                // حلقة المسح الفوري العتادية
-                startNativeDetection(video);
-
-            } catch (err) {
-                console.error(err);
-                alert("تعذر فتح الكاميرا، يرجى التأكد من السماح بالصلاحيات.");
-                closeScanner();
             }
-        }
 
-        function startNativeDetection(video) {
-            if (nativeDetector) {
-                scanInterval = setInterval(async () => {
-                    if (video.readyState >= 2) {
-                        try {
-                            const barcodes = await nativeDetector.detect(video);
-                            if (barcodes.length > 0) {
-                                const detectedCode = barcodes[0].rawValue;
-                                if (detectedCode) {
-                                    closeScanner();
-                                    handleScanResult(detectedCode);
-                                }
-                            }
-                        } catch (e) {}
-                    }
-                }, 80); // مسح سريع جداً كل 80 مللي ثانية
-            } else {
-                // بديل للمتصفحات القديمة
-                document.getElementById('status').innerText = "⚠️ يرجى استخدام متصفح سفاري المحدث";
-            }
+            const config = { 
+                fps: 20, 
+                qrbox: { width: 260, height: 130 }, // إطار مسح ضيق يركز على الخطوط فقط
+                aspectRatio: 1.0,
+                disableFlip: false
+            };
+
+            html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
+                .then(() => { isCameraRunning = true; })
+                .catch(err => {
+                    alert("يرجى إعطاء صلاحية الكاميرا لمتصفح Safari.");
+                    closeScanner();
+                });
         }
 
         function closeScanner() {
-            if (scanInterval) {
-                clearInterval(scanInterval);
-                scanInterval = null;
+            if (isCameraRunning && html5QrCode) {
+                html5QrCode.stop().then(() => {
+                    isCameraRunning = false;
+                    document.getElementById('camera-wrapper').style.display = 'none';
+                    document.getElementById('btn-start').style.display = 'flex';
+                }).catch(err => console.error(err));
+            } else {
+                document.getElementById('camera-wrapper').style.display = 'none';
+                document.getElementById('btn-start').style.display = 'flex';
             }
-            if (mediaStream) {
-                mediaStream.getTracks().forEach(track => track.stop());
-                mediaStream = null;
-            }
-            document.getElementById('camera-wrapper').style.display = 'none';
-            document.getElementById('btn-start').style.display = 'flex';
         }
 
         function handleScanResult(decodedText) {
@@ -643,6 +576,11 @@
                     </button>
                 `;
             }
+        }
+
+        function onScanSuccess(decodedText) {
+            closeScanner();
+            handleScanResult(decodedText);
         }
 
         function processManualScan() {
