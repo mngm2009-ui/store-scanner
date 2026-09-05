@@ -12,7 +12,7 @@
             font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             text-align: center;
             background-color: #f8fafc;
-            padding: 20px 15px 60px 15px;
+            padding: 15px 15px 60px 15px;
             margin: 0;
             color: #0f172a;
         }
@@ -20,12 +20,12 @@
         .header {
             background: #ffffff;
             border-radius: 16px;
-            padding: 16px;
-            margin-bottom: 15px;
+            padding: 14px;
+            margin-bottom: 12px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.04);
             border: 1px solid #e2e8f0;
         }
-        h2 { margin: 0 0 6px 0; font-size: 22px; color: #dc2626; }
+        h2 { margin: 0 0 6px 0; font-size: 20px; color: #dc2626; }
         #status { font-size: 13px; font-weight: bold; color: #64748b; }
 
         .btn-scan {
@@ -34,7 +34,7 @@
             color: #ffffff;
             border: none;
             padding: 16px;
-            font-size: 19px;
+            font-size: 18px;
             font-weight: bold;
             border-radius: 14px;
             cursor: pointer;
@@ -105,50 +105,82 @@
             box-shadow: 0 6px 16px rgba(0,0,0,0.05);
         }
 
-        .price-badge {
-            background: #f1f5f9;
-            padding: 8px 12px;
-            border-radius: 8px;
-            margin: 10px 0;
-            font-size: 14px;
+        .product-meta {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin: 8px 0;
+        }
+        .meta-pill {
+            background: #e0f2fe;
+            color: #0369a1;
+            font-size: 13px;
+            font-weight: bold;
+            padding: 4px 10px;
+            border-radius: 6px;
         }
 
-        .offer-form {
-            margin-top: 15px;
-            padding-top: 12px;
-            border-top: 2px dashed #f1f5f9;
-        }
-        .offer-form label {
-            display: block;
-            font-weight: bold;
+        .price-badge {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 10px 14px;
+            border-radius: 10px;
+            margin: 10px 0;
             font-size: 14px;
-            margin-bottom: 6px;
-            color: #0f172a;
+            line-height: 1.6;
         }
+
+        /* خيارات العرض: حبة أو حزمة */
+        .offer-type-selector {
+            display: flex;
+            gap: 8px;
+            margin: 12px 0;
+        }
+        .type-btn {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #e2e8f0;
+            background: #f8fafc;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .type-btn.active {
+            border-color: #dc2626;
+            background: #fef2f2;
+            color: #dc2626;
+        }
+
         .offer-inputs {
             display: flex;
             gap: 8px;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
+            align-items: center;
         }
         .offer-inputs input {
-            flex: 1;
             padding: 12px;
             border: 2px solid #fda4af;
             border-radius: 10px;
-            font-size: 18px;
+            font-size: 16px;
             font-weight: bold;
             text-align: center;
             outline: none;
         }
+        .input-price { flex: 2; }
+        .input-qty { flex: 1.2; }
+
         .btn-save {
+            width: 100%;
             background: #16a34a;
             color: white;
             border: none;
-            padding: 12px 18px;
+            padding: 14px;
             border-radius: 10px;
-            font-size: 15px;
+            font-size: 16px;
             font-weight: bold;
             cursor: pointer;
+            margin-bottom: 8px;
         }
         .btn-delete {
             width: 100%;
@@ -169,7 +201,7 @@
             transform: translateX(-50%);
             background: #0f172a;
             color: #ffffff;
-            padding: 10px 20px;
+            padding: 12px 24px;
             border-radius: 30px;
             font-size: 14px;
             font-weight: bold;
@@ -183,7 +215,7 @@
 
     <div class="container">
         <div class="header">
-            <h2>🏷️ إدارة عروض الأسعار</h2>
+            <h2>🏷️ إدارة عروض الأسعار والكميات</h2>
             <div id="status">⏳ جاري الاتصال بالجدول...</div>
         </div>
 
@@ -210,11 +242,12 @@
         let products = [];
         let html5QrCode = null;
         let isCamRunning = false;
+        let selectedOfferType = 'single'; // 'single' أو 'bundle'
 
         const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQCpR9i8vwj3iwcjDyB3xQjx2iTaD3s1kLjYRbwNQW-IOcrdADwRE4mBGbk96pxKGKLYqfbpjVuDLqI/pub?output=csv";
         const webAppUrl = "https://script.google.com/macros/s/AKfycbxkrlCtQUsFsSYWHGLSqQzo1JizU0q6flEYiGjw1UnuMg4oHU1SVUfUv2PAzFGaKZUD/exec";
 
-        function showToast(msg, duration = 3000) {
+        function showToast(msg, duration = 3500) {
             const toast = document.getElementById('toast');
             toast.innerText = msg;
             toast.style.display = 'block';
@@ -287,6 +320,31 @@
             }
         }
 
+        function setOfferType(type) {
+            selectedOfferType = type;
+            document.getElementById('type-single').classList.toggle('active', type === 'single');
+            document.getElementById('type-bundle').classList.toggle('active', type === 'bundle');
+            
+            const bundleBox = document.getElementById('bundle-qty-box');
+            if (type === 'bundle') {
+                bundleBox.style.display = 'block';
+                document.getElementById('offer-price-label').innerText = "السعر الإجمالي للكمية (€):";
+            } else {
+                bundleBox.style.display = 'none';
+                document.getElementById('offer-price-label').innerText = "سعر العرض للقطعة الواحدة (€):";
+            }
+        }
+
+        function parseOfferString(offerStr) {
+            if (!offerStr) return null;
+            const str = String(offerStr).trim();
+            if (str.includes('@')) {
+                const parts = str.split('@');
+                return { isBundle: true, qty: parseInt(parts[0]), price: parseFloat(parts[1]) };
+            }
+            return { isBundle: false, qty: 1, price: parseFloat(str) };
+        }
+
         function displayProduct(code) {
             const card = document.getElementById('product-card');
             const item = findProduct(code);
@@ -299,44 +357,98 @@
             }
 
             const name = item.Produkt || item.produkt || item.name || item.Name || 'منتج';
-            const price = item.Preis || item.preis || item.price || item.Price || '0';
-            const offer = item.Offer || item.offer || '';
+            const price = parseFloat(item.Preis || item.preis || item.price || item.Price || '0');
+            const desc = item.Beschreibung || item.beschreibung || item.desc || item.Description || item['الوصف'] || '';
+            const rawOffer = item.Offer || item.offer || '';
             const barcode = item.Barcode || item.barcode || item['بار كود'] || code;
+
+            const parsedOffer = parseOfferString(rawOffer);
+            let currentOfferText = '<span style="color:#64748b;">لا يوجد عرض مسجل حالياً</span>';
+            
+            if (parsedOffer && !isNaN(parsedOffer.price)) {
+                if (parsedOffer.isBundle) {
+                    currentOfferText = `<span style="color:#dc2626; font-weight:bold;">🔥 عرض كمية: ${parsedOffer.qty} علب بسعر ${parsedOffer.price.toFixed(2)} €</span>`;
+                } else {
+                    currentOfferText = `<span style="color:#dc2626; font-weight:bold;">🔥 عرض للحبة: ${parsedOffer.price.toFixed(2)} €</span>`;
+                }
+            }
+
+            selectedOfferType = (parsedOffer && parsedOffer.isBundle) ? 'bundle' : 'single';
 
             card.style.display = 'block';
             card.style.borderColor = '#e2e8f0';
             card.innerHTML = `
                 <div style="font-size: 18px; font-weight: 800; color: #0f172a;">${name}</div>
-                <div style="font-size: 12px; color: #64748b; margin-top:2px;">باركود: ${barcode}</div>
+                
+                <div class="product-meta">
+                    <span class="meta-pill">⚖️ الوزن / الحجم: ${desc ? desc : 'غير محدد'}</span>
+                    <span class="meta-pill" style="background:#f1f5f9; color:#475569;">باركود: ${barcode}</span>
+                </div>
                 
                 <div class="price-badge">
-                    السعر الأساسي: <b>${parseFloat(price).toFixed(2)} €</b>
-                    ${offer ? `<br><span style="color:#dc2626; font-weight:bold;">سعر العرض الحالي: ${parseFloat(offer).toFixed(2)} € 🔥</span>` : '<br><span style="color:#64748b;">لا يوجد عرض مسجل حالياً</span>'}
+                    السعر الأساسي: <b>${price.toFixed(2)} €</b><br>
+                    الحالة الحالية: ${currentOfferText}
                 </div>
 
                 <div class="offer-form">
-                    <label>اكتب سعر العرض الجديد:</label>
-                    <div class="offer-inputs">
-                        <input type="number" step="0.01" id="offer-val" placeholder="مثال: 1.99" value="${offer || ''}">
-                        <button class="btn-save" onclick="updateOffer('${barcode}', false)">💾 حفظ العرض</button>
+                    <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:6px;">نوع العرض الجديد:</label>
+                    <div class="offer-type-selector">
+                        <button type="button" id="type-single" class="type-btn ${selectedOfferType==='single'?'active':''}" onclick="setOfferType('single')">قطعة واحدة</button>
+                        <button type="button" id="type-bundle" class="type-btn ${selectedOfferType==='bundle'?'active':''}" onclick="setOfferType('bundle')">حزمة (3 علب / 5 مواد...)</button>
                     </div>
-                    ${offer ? `<button class="btn-delete" onclick="updateOffer('${barcode}', true)">🗑️ إزالة العرض الآن</button>` : ''}
+
+                    <div style="text-align:right; margin-bottom:6px;">
+                        <span id="offer-price-label" style="font-size:13px; font-weight:bold;">
+                            ${selectedOfferType==='bundle' ? 'السعر الإجمالي للكمية (€):' : 'سعر العرض للقطعة الواحدة (€):'}
+                        </span>
+                    </div>
+
+                    <div class="offer-inputs">
+                        <input type="number" step="0.01" id="offer-price-input" class="input-price" placeholder="السعر (€)" value="${parsedOffer ? parsedOffer.price : ''}">
+                        
+                        <div id="bundle-qty-box" style="display:${selectedOfferType==='bundle'?'block':'none'}; flex:1.2;">
+                            <input type="number" min="2" id="offer-qty-input" class="input-qty" placeholder="الكمية (مثلاً 3)" value="${(parsedOffer && parsedOffer.isBundle) ? parsedOffer.qty : '3'}">
+                        </div>
+                    </div>
+
+                    <button class="btn-save" onclick="saveOffer('${barcode}')">💾 حفظ العرض في الشيت</button>
+                    ${rawOffer ? `<button class="btn-delete" onclick="removeOffer('${barcode}')">🗑️ إزالة العرض وتصفيره</button>` : ''}
                 </div>
             `;
         }
 
-        function updateOffer(barcode, isDelete) {
-            const val = isDelete ? "" : document.getElementById('offer-val').value.trim();
-            if (!isDelete && (!val || isNaN(parseFloat(val)))) {
-                alert("يرجى كتابة رقم سعر صحيح");
+        function saveOffer(barcode) {
+            const priceVal = document.getElementById('offer-price-input').value.trim();
+            if (!priceVal || isNaN(parseFloat(priceVal))) {
+                alert("يرجى كتابة سعر صحيح");
                 return;
             }
 
-            showToast(isDelete ? "⏳ جاري إزالة العرض..." : "⏳ جاري إرسال العرض للشيت...");
+            let finalOfferPayload = "";
+            if (selectedOfferType === 'bundle') {
+                const qtyVal = parseInt(document.getElementById('offer-qty-input').value.trim());
+                if (!qtyVal || qtyVal < 2) {
+                    alert("يرجى تحديد كمية صحيحة للحزمة (حبتين فأكثر)");
+                    return;
+                }
+                finalOfferPayload = `${qtyVal}@${parseFloat(priceVal).toFixed(2)}`;
+            } else {
+                finalOfferPayload = parseFloat(priceVal).toFixed(2);
+            }
+
+            sendToSheet(barcode, finalOfferPayload, "✅ تم حفظ العرض بنجاح في غوغل شيت!");
+        }
+
+        function removeOffer(barcode) {
+            sendToSheet(barcode, "", "✅ تم مسح العرض بنجاح!");
+        }
+
+        function sendToSheet(barcode, offerValue, successMsg) {
+            showToast("⏳ جاري التحديث في غوغل شيت...");
 
             const payload = [{
                 barcode: barcode,
-                offer: val
+                offer: offerValue
             }];
 
             fetch(webAppUrl, {
@@ -345,17 +457,16 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             }).then(() => {
-                showToast(isDelete ? "✅ تم حذف العرض بنجاح" : "✅ تم تثبيت سعر العرض في الشيت!");
-                
-                // تحديث البيانات محلياً
+                showToast(successMsg);
+                // تحديث المتغير محلياً لتحديث العرض فوراً
                 const p = findProduct(barcode);
                 if (p) {
-                    if (p.Offer !== undefined) p.Offer = val;
-                    if (p.offer !== undefined) p.offer = val;
+                    if (p.Offer !== undefined) p.Offer = offerValue;
+                    if (p.offer !== undefined) p.offer = offerValue;
                 }
                 displayProduct(barcode);
             }).catch(err => {
-                alert("خطأ في الاتصال: " + err);
+                alert("تعذر الاتصال بـ غوغل شيت: " + err);
             });
         }
     </script>
