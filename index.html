@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>كاشير ومحاسبة المحل</title>
-    <!-- مكتبة الكاميرا المستقرة والمخصصة -->
+    <!-- مكتبة الكاميرا الاحتياطية -->
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <!-- مكتبة قراءة CSV -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
@@ -23,37 +23,6 @@
         h2 { margin: 5px 0 10px 0; font-size: 24px; }
         #status { font-weight: 600; margin-bottom: 12px; font-size: 15px; color: #d97706; }
         
-        /* شريط التبديل بين الكاشير ووضع تعديل العروض */
-        .mode-toggle-bar {
-            display: flex;
-            background: #e2e8f0;
-            padding: 4px;
-            border-radius: 14px;
-            margin-bottom: 12px;
-            gap: 4px;
-        }
-        .mode-btn {
-            flex: 1;
-            padding: 10px;
-            border: none;
-            border-radius: 10px;
-            font-size: 14px;
-            font-weight: bold;
-            cursor: pointer;
-            color: #64748b;
-            background: transparent;
-            transition: all 0.2s;
-        }
-        .mode-btn.active {
-            background: #ffffff;
-            color: #0f172a;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-        }
-        .mode-btn.offer-mode.active {
-            background: #dc2626;
-            color: #ffffff;
-        }
-
         .btn-open-cam {
             width: 100%;
             background: #2563eb;
@@ -108,7 +77,41 @@
             display: none;
             position: relative;
         }
-        #reader { width: 100%; min-height: 280px; }
+        #reader-container {
+            width: 100%;
+            min-height: 280px;
+            position: relative;
+            background: #000;
+        }
+        #native-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        /* دليل التوجيه لمساعدة العين في وضع الباركود */
+        .guide-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            height: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.6);
+            border-radius: 12px;
+            pointer-events: none;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.25);
+        }
+        .laser {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: #ef4444;
+            box-shadow: 0 0 8px #ef4444;
+        }
 
         .btn-close-cam {
             background: #ef4444;
@@ -132,7 +135,6 @@
             text-align: right;
         }
         .success-box { background: #ffffff; border-right: 6px solid #16a34a; }
-        .offer-edit-box { background: #fff1f2; border-right: 6px solid #e11d48; }
         .error-box { background: #fef2f2; border: 2px solid #f87171; border-right: 6px solid #dc2626; }
 
         .brand-badge {
@@ -285,49 +287,6 @@
             display: none;
         }
 
-        /* تنسيق نموذج إدخال العرض الجديد */
-        .offer-action-form {
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px dashed #f43f5e;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        .offer-input-group {
-            display: flex;
-            gap: 8px;
-        }
-        .offer-input-group input {
-            flex: 1;
-            padding: 10px;
-            border: 2px solid #fda4af;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: bold;
-            text-align: center;
-            outline: none;
-        }
-        .btn-save-offer {
-            background: #e11d48;
-            color: white;
-            border: none;
-            padding: 10px 16px;
-            border-radius: 8px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        .btn-delete-offer {
-            background: #64748b;
-            color: white;
-            border: none;
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-
         #invoice-modal {
             display: none;
             position: fixed;
@@ -365,19 +324,17 @@
         <h2>🧾 كاشير ومحاسبة المحل</h2>
         <div id="status">⏳ جاري تحميل بيانات المنتجات...</div>
 
-        <!-- زر التبديل بين وضع البيع وتعديل العروض -->
-        <div class="mode-toggle-bar">
-            <button id="mode-cashier" class="mode-btn active" onclick="switchAppMode('cashier')">🛒 محاسبة وكاشير</button>
-            <button id="mode-offers" class="mode-btn offer-mode" onclick="switchAppMode('offers')">🏷️ وضع العروض والخصومات</button>
-        </div>
-
         <!-- زر فتح الكاميرا -->
         <button id="btn-start" class="btn-open-cam" onclick="openScanner()">
             <span>📷</span> مسح الباركود بالكاميرا
         </button>
 
         <div id="camera-wrapper">
-            <div id="reader"></div>
+            <div id="reader-container">
+                <video id="native-video" playsinline webkit-playsinline autoplay muted></video>
+                <div class="guide-box"><div class="laser"></div></div>
+            </div>
+            <div id="reader" style="display: none;"></div>
             <button class="btn-close-cam" onclick="closeScanner()">❌ إلغاء</button>
         </div>
 
@@ -389,40 +346,37 @@
 
         <div id="last-scanned"></div>
 
-        <!-- حاوية الكاشير والسلة (تختفي في وضع العروض) -->
-        <div id="cashier-container">
-            <div class="total-card">
-                <div class="total-title">المجموع الكلي:</div>
-                <div class="total-amount" id="grand-total">0.00 €</div>
+        <div class="total-card">
+            <div class="total-title">المجموع الكلي:</div>
+            <div class="total-amount" id="grand-total">0.00 €</div>
+        </div>
+
+        <button id="btn-pay" class="btn-pay" onclick="processPayment()">
+            💳 تم الدفع وحفظ الفاتورة
+        </button>
+
+        <div class="cart-section">
+            <div class="section-header">
+                <h3>🛒 السلة الحالية (<span id="items-count">0</span>)</h3>
+                <button class="btn-clear" onclick="clearCart()">مسح السلة</button>
             </div>
+            <ul class="cart-items" id="cart-list">
+                <li class="empty-msg">لم يتم مسح أي منتج بعد</li>
+            </ul>
+        </div>
 
-            <button id="btn-pay" class="btn-pay" onclick="processPayment()">
-                💳 تم الدفع وحفظ الفاتورة
-            </button>
-
-            <div class="cart-section">
-                <div class="section-header">
-                    <h3>🛒 السلة الحالية (<span id="items-count">0</span>)</h3>
-                    <button class="btn-clear" onclick="clearCart()">مسح السلة</button>
-                </div>
-                <ul class="cart-items" id="cart-list">
-                    <li class="empty-msg">لم يتم مسح أي منتج بعد</li>
-                </ul>
+        <div class="invoices-section">
+            <div class="section-header">
+                <h3>📁 سجل الفواتير السابقة (<span id="invoices-count">0</span>)</h3>
+                <button class="btn-clear" onclick="clearInvoices()">🗑️ مسح الأرشيف</button>
             </div>
-
-            <div class="invoices-section">
-                <div class="section-header">
-                    <h3>📁 سجل الفواتير السابقة (<span id="invoices-count">0</span>)</h3>
-                    <button class="btn-clear" onclick="clearInvoices()">🗑️ مسح الأرشيف</button>
-                </div>
-                <div class="invoice-list" id="invoices-list">
-                    <div class="empty-msg">لا توجد فواتير سابقة</div>
-                </div>
+            <div class="invoice-list" id="invoices-list">
+                <div class="empty-msg">لا توجد فواتير سابقة</div>
             </div>
         </div>
     </div>
 
-    <!-- نافذة منبثقة للطباعة -->
+    <!-- نافذة الفاتورة المنبثقة -->
     <div id="invoice-modal">
         <div class="modal-content" id="printable-area">
             <div style="text-align:center; border-bottom: 2px dashed #000; padding-bottom: 10px;">
@@ -450,7 +404,7 @@
         </div>
     </div>
 
-    <!-- زر الزاوية للإدارة -->
+    <!-- زر تحديث CSV -->
     <div class="admin-corner">
         <label class="admin-btn" for="file-input">
             ⚙️ 📂 تحديث ملف CSV
@@ -465,37 +419,18 @@
     </audio>
 
     <script>
-        let currentMode = 'cashier'; // 'cashier' أو 'offers'
         let products = [];
         let cart = [];
         let invoices = JSON.parse(localStorage.getItem('store_invoices') || '[]');
         let html5QrCode = null;
         let isCameraRunning = false;
         let audioCtx = null;
+        let nativeStream = null;
+        let nativeScanTimer = null;
 
         const beepSuccess = document.getElementById('beep-success');
         const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQCpR9i8vwj3iwcjDyB3xQjx2iTaD3s1kLjYRbwNQW-IOcrdADwRE4mBGbk96pxKGKLYqfbpjVuDLqI/pub?output=csv";
         const webAppUrl = "https://script.google.com/macros/s/AKfycbxkrlCtQUsFsSYWHGLSqQzo1JizU0q6flEYiGjw1UnuMg4oHU1SVUfUv2PAzFGaKZUD/exec";
-
-        function switchAppMode(mode) {
-            currentMode = mode;
-            document.getElementById('mode-cashier').classList.toggle('active', mode === 'cashier');
-            document.getElementById('mode-offers').classList.toggle('active', mode === 'offers');
-            
-            const cashierSection = document.getElementById('cashier-container');
-            const btnStart = document.getElementById('btn-start');
-            
-            if (mode === 'offers') {
-                cashierSection.style.display = 'none';
-                btnStart.style.background = '#dc2626';
-                btnStart.innerHTML = '<span>🏷️</span> مسح منتج لتعديل العرض';
-            } else {
-                cashierSection.style.display = 'block';
-                btnStart.style.background = '#2563eb';
-                btnStart.innerHTML = '<span>📷</span> مسح الباركود بالكاميرا';
-            }
-            document.getElementById('last-scanned').style.display = 'none';
-        }
 
         function playErrorSound() {
             try {
@@ -578,56 +513,110 @@
             });
         }
 
-        function openScanner() {
+        // تشغيل المسح المباشر فائق الدقة للآيفون
+        async function openScanner() {
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             beepSuccess.play().then(() => { beepSuccess.pause(); beepSuccess.currentTime = 0; }).catch(() => {});
 
             document.getElementById('camera-wrapper').style.display = 'block';
             document.getElementById('btn-start').style.display = 'none';
 
+            // 1. فحص دعم محرك الذكاء الاصطناعي الأصلي لنظام iOS
+            if ('BarcodeDetector' in window) {
+                try {
+                    const detector = new BarcodeDetector({
+                        formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39']
+                    });
+
+                    // طلب أعلى دقة ممكنة من كاميرا الآيفون
+                    nativeStream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            facingMode: "environment",
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 }
+                        },
+                        audio: false
+                    });
+
+                    document.getElementById('reader-container').style.display = 'block';
+                    document.getElementById('reader').style.display = 'none';
+
+                    const videoEl = document.getElementById('native-video');
+                    videoEl.srcObject = nativeStream;
+                    await videoEl.play();
+                    isCameraRunning = true;
+
+                    // مسح مستمر وسريع
+                    nativeScanTimer = setInterval(async () => {
+                        if (!isCameraRunning) return;
+                        try {
+                            const barcodes = await detector.detect(videoEl);
+                            if (barcodes.length > 0) {
+                                const detectedCode = barcodes[0].rawValue;
+                                closeScanner();
+                                handleScanResult(detectedCode);
+                            }
+                        } catch (e) {}
+                    }, 120);
+
+                    return;
+                } catch (err) {
+                    console.warn("المحرك الذكي غير متوفر، جاري الانتقال للمكتبة...", err);
+                }
+            }
+
+            // 2. إذا لم يكن مدعوماً، نستخدم المحرك الاحتياطي
+            document.getElementById('reader-container').style.display = 'none';
+            document.getElementById('reader').style.display = 'block';
+
             if (!html5QrCode) {
                 html5QrCode = new Html5Qrcode("reader", {
-                    formatsToSupport: [ 
-                        Html5QrcodeSupportedFormats.EAN_13, 
-                        Html5QrcodeSupportedFormats.EAN_8, 
-                        Html5QrcodeSupportedFormats.UPC_A, 
-                        Html5QrcodeSupportedFormats.UPC_E, 
+                    formatsToSupport: [
+                        Html5QrcodeSupportedFormats.EAN_13,
+                        Html5QrcodeSupportedFormats.EAN_8,
+                        Html5QrcodeSupportedFormats.UPC_A,
+                        Html5QrcodeSupportedFormats.UPC_E,
                         Html5QrcodeSupportedFormats.CODE_128
                     ]
                 });
             }
 
-            const config = { 
-                fps: 25,
+            const config = {
+                fps: 20,
                 qrbox: (viewfinderWidth, viewfinderHeight) => {
                     const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-                    return {
-                        width: Math.floor(minEdge * 0.85),
-                        height: Math.floor(minEdge * 0.55)
-                    };
+                    return { width: Math.floor(minEdge * 0.85), height: Math.floor(minEdge * 0.5) };
                 }
             };
 
-            html5QrCode.start(
-                { facingMode: "environment" }, 
-                config, 
-                onScanSuccess
-            ).then(() => { 
-                isCameraRunning = true; 
-            }).catch(err => {
-                console.error("Camera Error:", err);
-                alert("تعذر تشغيل الكاميرا: " + (err.name || err.message || err));
-                closeScanner();
-            });
+            html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
+                .then(() => { isCameraRunning = true; })
+                .catch(err => {
+                    alert("تعذر تشغيل الكاميرا: " + (err.name || err.message || err));
+                    closeScanner();
+                });
         }
 
         function closeScanner() {
-            if (isCameraRunning && html5QrCode) {
+            isCameraRunning = false;
+
+            if (nativeScanTimer) {
+                clearInterval(nativeScanTimer);
+                nativeScanTimer = null;
+            }
+            if (nativeStream) {
+                nativeStream.getTracks().forEach(track => track.stop());
+                nativeStream = null;
+            }
+
+            if (html5QrCode && html5QrCode.isScanning) {
                 html5QrCode.stop().then(() => {
-                    isCameraRunning = false;
                     document.getElementById('camera-wrapper').style.display = 'none';
                     document.getElementById('btn-start').style.display = 'flex';
-                }).catch(err => console.error(err));
+                }).catch(() => {
+                    document.getElementById('camera-wrapper').style.display = 'none';
+                    document.getElementById('btn-start').style.display = 'flex';
+                });
             } else {
                 document.getElementById('camera-wrapper').style.display = 'none';
                 document.getElementById('btn-start').style.display = 'flex';
@@ -641,38 +630,14 @@
 
             if (product) {
                 playSuccessSound();
+                lastScannedDiv.className = 'success-box';
+
                 const name = product.name || 'منتج';
                 const rawPrice = cleanString(product.price || '0').replace(',', '.');
                 const rawOffer = cleanString(product.offer || '').replace(',', '.');
                 const desc = product.desc || '';
                 const brand = product.brand || '';
-                const brandHtml = brand ? `<div class="brand-badge">🏷️ ${brand}</div>` : '';
 
-                // إذا كنا في وضع تعديل العروض (Offer Mode)
-                if (currentMode === 'offers') {
-                    lastScannedDiv.className = 'offer-edit-box';
-                    lastScannedDiv.innerHTML = `
-                        <div style="color: #e11d48; font-weight: bold; font-size: 15px; margin-bottom: 4px;">🏷️ تعديل سعر العرض لهذا المنتج:</div>
-                        ${brandHtml}
-                        <div style="font-size: 18px; font-weight: 800; color: #0f172a;">${name}</div>
-                        <div style="font-size: 13px; color: #64748b;">السعر الأساسي: <b>${parseFloat(rawPrice).toFixed(2)} €</b></div>
-                        <div style="font-size: 13px; color: ${rawOffer ? '#e11d48' : '#64748b'}; font-weight: bold; margin-top: 2px;">
-                            ${rawOffer ? `العرض الحالي: ${parseFloat(rawOffer).toFixed(2)} € 🔥` : 'لا يوجد عرض مسجل حالياً'}
-                        </div>
-
-                        <div class="offer-action-form">
-                            <div class="offer-input-group">
-                                <input type="number" step="0.01" id="new-offer-input" placeholder="سعر العرض الجديد..." value="${rawOffer || ''}">
-                                <button class="btn-save-offer" onclick="submitNewOffer('${product.barcode}')">💾 حفظ العرض</button>
-                            </div>
-                            ${rawOffer ? `<button class="btn-delete-offer" onclick="submitNewOffer('${product.barcode}', true)">❌ إلغاء وحذف العرض الحالي</button>` : ''}
-                        </div>
-                    `;
-                    return;
-                }
-
-                // الوضع العادي (الكاشير والمحاسبة)
-                lastScannedDiv.className = 'success-box';
                 const hasOffer = (rawOffer !== "" && !isNaN(parseFloat(rawOffer)));
                 const finalPrice = hasOffer ? parseFloat(rawOffer) : parseFloat(rawPrice);
 
@@ -684,6 +649,8 @@
                     isOffer: hasOffer,
                     originalPrice: parseFloat(rawPrice)
                 });
+
+                const brandHtml = brand ? `<div class="brand-badge">🏷️ ${brand}</div>` : '';
 
                 lastScannedDiv.innerHTML = `
                     <div style="color: #16a34a; font-weight: bold; font-size: 15px; margin-bottom: 6px;">✅ تم تسجيل المنتج:</div>
@@ -705,50 +672,14 @@
                     <div style="font-size: 15px; color: #1e293b; font-weight: 600;">
                         كود الباركود: <span style="font-family: monospace; background: #e2e8f0; padding: 3px 8px; border-radius: 6px;">${decodedText}</span>
                     </div>
+                    <div style="font-size: 13px; color: #64748b; margin-top: 6px;">
+                        تأكد من إضافته إلى جدول Google Sheets.
+                    </div>
                     <button onclick="openScanner()" style="margin-top: 12px; width: 100%; background: #dc2626; color: white; border: none; padding: 12px; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer;">
                         🔄 مسح كود آخر
                     </button>
                 `;
             }
-        }
-
-        // إرسال سعر العرض الجديد لـ Google Sheets
-        function submitNewOffer(barcode, isDelete = false) {
-            const offerVal = isDelete ? "" : document.getElementById('new-offer-input').value.trim();
-            if (!isDelete && (!offerVal || isNaN(parseFloat(offerVal)))) {
-                alert("يرجى كتابة رقم سعر صحيح للعرض.");
-                return;
-            }
-
-            const targetProduct = products.find(p => p.barcode === barcode);
-            if (!targetProduct) return;
-
-            const toast = document.getElementById('upload-toast');
-            toast.innerText = isDelete ? "⏳ جاري حذف العرض من الشيت..." : "⏳ جاري إرسال سعر العرض للشيت...";
-            toast.style.display = 'block';
-
-            const payload = [{
-                barcode: barcode,
-                name: targetProduct.name,
-                price: targetProduct.price,
-                offer: offerVal,
-                desc: targetProduct.desc
-            }];
-
-            fetch(webAppUrl, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            }).then(() => {
-                targetProduct.offer = offerVal; // تحديث فوري في الذاكرة
-                toast.innerText = isDelete ? "✅ تم إلغاء العرض بنجاح!" : "✅ تم تثبيت سعر العرض بنجاح في الشيت!";
-                handleScanResult(barcode); // إعادة تحديث البطاقة
-                setTimeout(() => { toast.style.display = 'none'; }, 4000);
-            }).catch(err => {
-                alert("تعذر الاتصال بـ Google Sheets: " + err);
-                toast.style.display = 'none';
-            });
         }
 
         function onScanSuccess(decodedText) {
