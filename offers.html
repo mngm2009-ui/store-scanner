@@ -16,7 +16,7 @@
             margin: 0;
             color: #0f172a;
         }
-        .container { max-width: 480px; margin: 0 auto; }
+        .container { max-width: 480px; margin: 0 auto; position: relative; }
         .header {
             background: #ffffff;
             border-radius: 16px;
@@ -47,19 +47,22 @@
         }
         .btn-scan:active { transform: scale(0.98); background: #b91c1c; }
 
+        /* مربع البحث المشترك بالباركود أو الاسم */
+        .search-box-wrapper {
+            position: relative;
+            margin-bottom: 15px;
+        }
         .input-row {
             display: flex;
             gap: 8px;
-            margin-bottom: 15px;
         }
         .input-row input {
             flex: 1;
-            padding: 12px;
+            padding: 13px;
             border: 2px solid #cbd5e1;
             border-radius: 12px;
-            font-size: 16px;
-            font-family: monospace;
-            text-align: center;
+            font-size: 15px;
+            text-align: right;
             outline: none;
         }
         .input-row input:focus { border-color: #dc2626; }
@@ -67,11 +70,40 @@
             background: #0f172a;
             color: white;
             border: none;
-            padding: 12px 16px;
+            padding: 12px 18px;
             border-radius: 12px;
             font-weight: bold;
             cursor: pointer;
         }
+
+        /* قائمة نتائج البحث بالاسم */
+        .search-suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            max-height: 250px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+            text-align: right;
+            margin-top: 4px;
+        }
+        .suggestion-item {
+            padding: 10px 14px;
+            border-bottom: 1px solid #f1f5f9;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .suggestion-item:hover { background: #f8fafc; }
+        .suggestion-name { font-weight: bold; font-size: 14px; color: #0f172a; }
+        .suggestion-sub { font-size: 12px; color: #64748b; }
 
         #camera-wrapper {
             background: #000;
@@ -130,7 +162,6 @@
             line-height: 1.6;
         }
 
-        /* خيارات العرض: حبة أو حزمة */
         .offer-type-selector {
             display: flex;
             gap: 8px;
@@ -220,7 +251,7 @@
         </div>
 
         <button id="btn-open-cam" class="btn-scan" onclick="openScanner()">
-            <span>📷</span> مسح باركود المنتج بالكاميرا
+            <span>📷</span> مسح باركود بالكاميرا
         </button>
 
         <div id="camera-wrapper">
@@ -228,9 +259,13 @@
             <button class="btn-close" onclick="closeScanner()">إغلاق الكاميرا</button>
         </div>
 
-        <div class="input-row">
-            <input type="text" id="manual-code" placeholder="أو اكتب الباركود يدوياً..." onkeydown="if(event.key==='Enter') processManual()">
-            <button onclick="processManual()">بحث</button>
+        <!-- مربع البحث المشترك بالباركود أو الاسم -->
+        <div class="search-box-wrapper">
+            <div class="input-row">
+                <input type="text" id="smart-search" placeholder="🔍 اكتب اسم المنتج أو رقم الباركود..." oninput="handleSearchInput()" onkeydown="if(event.key==='Enter') executeSearch()">
+                <button onclick="executeSearch()">بحث</button>
+            </div>
+            <div id="suggestions" class="search-suggestions"></div>
         </div>
 
         <div id="product-card"></div>
@@ -242,7 +277,7 @@
         let products = [];
         let html5QrCode = null;
         let isCamRunning = false;
-        let selectedOfferType = 'single'; // 'single' أو 'bundle'
+        let selectedOfferType = 'single';
 
         const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQCpR9i8vwj3iwcjDyB3xQjx2iTaD3s1kLjYRbwNQW-IOcrdADwRE4mBGbk96pxKGKLYqfbpjVuDLqI/pub?output=csv";
         const webAppUrl = "https://script.google.com/macros/s/AKfycbxkrlCtQUsFsSYWHGLSqQzo1JizU0q6flEYiGjw1UnuMg4oHU1SVUfUv2PAzFGaKZUD/exec";
@@ -268,12 +303,85 @@
         }
         loadSheetData();
 
-        function findProduct(code) {
-            const scan = String(code).trim().replace(/^0+/, '');
-            return products.find(p => {
-                const b = String(p.Barcode || p.barcode || p['بار كود'] || p['BARCODE'] || '').trim().replace(/^0+/, '');
-                return b === scan;
+        // فحص البحث التلقائي أثناء الكتابة (للاقتراحات بالاسم)
+        function handleSearchInput() {
+            const query = document.getElementById('smart-search').value.trim().toLowerCase();
+            const sugBox = document.getElementById('suggestions');
+
+            // إذا كان المدخل فارغاً أو عبارة عن أرقام فقط (باركود)، لا نظهر القائمة المنسدلة
+            if (!query || /^\d+$/.test(query)) {
+                sugBox.style.display = 'none';
+                return;
+            }
+
+            const matches = products.filter(p => {
+                const name = (p.Produkt || p.produkt || p.name || p.Name || '').toLowerCase();
+                return name.includes(query);
+            }).slice(0, 6); // أول 6 نتائج
+
+            if (matches.length === 0) {
+                sugBox.style.display = 'none';
+                return;
+            }
+
+            let html = '';
+            matches.forEach(item => {
+                const name = item.Produkt || item.produkt || item.name || item.Name || '';
+                const code = item.Barcode || item.barcode || item['بار كود'] || '';
+                const price = parseFloat(item.Preis || item.preis || item.price || item.Price || 0).toFixed(2);
+                const desc = item.Beschreibung || item.beschreibung || item.desc || '';
+
+                html += `
+                    <div class="suggestion-item" onclick="selectSuggestedProduct('${code}')">
+                        <div>
+                            <div class="suggestion-name">${name}</div>
+                            <div class="suggestion-sub">${desc ? desc + ' | ' : ''}باركود: ${code}</div>
+                        </div>
+                        <div style="font-weight:bold; color:#16a34a;">${price} €</div>
+                    </div>
+                `;
             });
+
+            sugBox.innerHTML = html;
+            sugBox.style.display = 'block';
+        }
+
+        function selectSuggestedProduct(code) {
+            document.getElementById('suggestions').style.display = 'none';
+            document.getElementById('smart-search').value = '';
+            displayProduct(code);
+        }
+
+        function executeSearch() {
+            document.getElementById('suggestions').style.display = 'none';
+            const query = document.getElementById('smart-search').value.trim();
+            if (!query) return;
+
+            // 1. فحص إذا كان باركود
+            const cleanQuery = query.replace(/^0+/, '');
+            let product = products.find(p => {
+                const b = String(p.Barcode || p.barcode || p['بار كود'] || '').trim().replace(/^0+/, '');
+                return b === cleanQuery;
+            });
+
+            // 2. إذا لم يكن باركود، ابحث بالاسم
+            if (!product) {
+                product = products.find(p => {
+                    const name = (p.Produkt || p.produkt || p.name || p.Name || '').toLowerCase();
+                    return name.includes(query.toLowerCase());
+                });
+            }
+
+            if (product) {
+                const code = product.Barcode || product.barcode || product['بار كود'] || '';
+                displayProduct(code);
+                document.getElementById('smart-search').value = '';
+            } else {
+                const card = document.getElementById('product-card');
+                card.style.display = 'block';
+                card.style.borderColor = '#dc2626';
+                card.innerHTML = `<div style="color:#dc2626; font-weight:bold;">❌ لم يتم العثور على أي منتج يطابق: "${query}"</div>`;
+            }
         }
 
         function openScanner() {
@@ -311,15 +419,6 @@
             }
         }
 
-        function processManual() {
-            const input = document.getElementById('manual-code');
-            const code = input.value.trim();
-            if (code) {
-                displayProduct(code);
-                input.value = '';
-            }
-        }
-
         function setOfferType(type) {
             selectedOfferType = type;
             document.getElementById('type-single').classList.toggle('active', type === 'single');
@@ -347,7 +446,11 @@
 
         function displayProduct(code) {
             const card = document.getElementById('product-card');
-            const item = findProduct(code);
+            const cleanCode = String(code).trim().replace(/^0+/, '');
+            const item = products.find(p => {
+                const b = String(p.Barcode || p.barcode || p['بار كود'] || '').trim().replace(/^0+/, '');
+                return b === cleanCode;
+            });
 
             if (!item) {
                 card.style.display = 'block';
@@ -458,8 +561,7 @@
                 body: JSON.stringify(payload)
             }).then(() => {
                 showToast(successMsg);
-                // تحديث المتغير محلياً لتحديث العرض فوراً
-                const p = findProduct(barcode);
+                const p = products.find(p => (p.Barcode || p.barcode || p['بار كود']) === barcode);
                 if (p) {
                     if (p.Offer !== undefined) p.Offer = offerValue;
                     if (p.offer !== undefined) p.offer = offerValue;
@@ -469,6 +571,13 @@
                 alert("تعذر الاتصال بـ غوغل شيت: " + err);
             });
         }
+
+        // إغلاق قائمة الاقتراحات عند الضغط في أي مكان خارجها
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.search-box-wrapper')) {
+                document.getElementById('suggestions').style.display = 'none';
+            }
+        });
     </script>
 </body>
 </html>
