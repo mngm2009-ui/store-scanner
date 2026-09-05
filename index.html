@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>كاشير ومحاسبة المحل</title>
-    <!-- مكتبة ZXing فائقة الدقة للباركود الصناعي والتجاري -->
-    <script src="https://unpkg.com/@zxing/library@latest"></script>
+    <!-- مكتبة الكاميرا المستقرة والمخصصة -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <!-- مكتبة قراءة CSV -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -77,52 +77,7 @@
             display: none;
             position: relative;
         }
-        #interactive-video {
-            width: 100%;
-            height: 280px;
-            object-fit: cover;
-            display: block;
-        }
-
-        /* خط ليزر وإطار توجيه لمسح الباركود بدقة */
-        .scan-target-box {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 80%;
-            height: 45%;
-            border: 2px solid rgba(255, 255, 255, 0.7);
-            border-radius: 12px;
-            pointer-events: none;
-            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35);
-        }
-        .laser-line {
-            width: 100%;
-            height: 2px;
-            background: #ef4444;
-            position: absolute;
-            top: 50%;
-            box-shadow: 0 0 8px #ef4444;
-        }
-
-        /* تحكم شريط التقريب اليدوي (Zoom) */
-        .zoom-controls {
-            padding: 10px 15px;
-            background: #1e293b;
-            color: #fff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            font-size: 14px;
-            font-weight: bold;
-        }
-        .zoom-slider {
-            flex: 1;
-            accent-color: #2563eb;
-            cursor: pointer;
-        }
+        #reader { width: 100%; min-height: 280px; }
 
         .btn-close-cam {
             background: #ef4444;
@@ -341,19 +296,7 @@
         </button>
 
         <div id="camera-wrapper">
-            <video id="interactive-video" playsinline webkit-playsinline autoplay muted></video>
-            
-            <div class="scan-target-box">
-                <div class="laser-line"></div>
-            </div>
-
-            <!-- شريط التحكم بالتقريب -->
-            <div class="zoom-controls" id="zoom-area" style="display: none;">
-                <span>🔍 1x</span>
-                <input type="range" id="zoom-slider" class="zoom-slider" min="1" max="5" step="0.1" value="1" oninput="applyZoom(this.value)">
-                <span id="zoom-val">1.0x</span>
-            </div>
-
+            <div id="reader"></div>
             <button class="btn-close-cam" onclick="closeScanner()">❌ إلغاء</button>
         </div>
 
@@ -441,10 +384,9 @@
         let products = [];
         let cart = [];
         let invoices = JSON.parse(localStorage.getItem('store_invoices') || '[]');
+        let html5QrCode = null;
         let isCameraRunning = false;
         let audioCtx = null;
-        let codeReader = null;
-        let currentTrack = null;
 
         const beepSuccess = document.getElementById('beep-success');
         const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQCpR9i8vwj3iwcjDyB3xQjx2iTaD3s1kLjYRbwNQW-IOcrdADwRE4mBGbk96pxKGKLYqfbpjVuDLqI/pub?output=csv";
@@ -531,110 +473,62 @@
             });
         }
 
-        // تطبيق التقريب (Zoom) يدوياً من الآيفون
-        function applyZoom(zoomFactor) {
-            document.getElementById('zoom-val').innerText = parseFloat(zoomFactor).toFixed(1) + 'x';
-            
-            // محاولة التقريب البصري من العدسة الأصلية
-            if (currentTrack && currentTrack.getCapabilities) {
-                const capabilities = currentTrack.getCapabilities();
-                if (capabilities.zoom) {
-                    currentTrack.applyConstraints({
-                        advanced: [{ zoom: parseFloat(zoomFactor) }]
-                    }).catch(() => {});
-                    return;
-                }
-            }
-            
-            // في حال عدم دعم المتصفح للتقريب البصري، يتم التقريب الرقمي فائق الوضوح
-            const videoEl = document.getElementById('interactive-video');
-            videoEl.style.transform = `scale(${zoomFactor})`;
-        }
-
-        async function openScanner() {
+        function openScanner() {
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             beepSuccess.play().then(() => { beepSuccess.pause(); beepSuccess.currentTime = 0; }).catch(() => {});
 
             document.getElementById('camera-wrapper').style.display = 'block';
             document.getElementById('btn-start').style.display = 'none';
 
-            // تفعيل محرك ZXing فائق الدقة المخصص للباركود
-            if (!codeReader) {
-                const hints = new Map();
-                const formats = [
-                    ZXing.BarcodeFormat.EAN_13,
-                    ZXing.BarcodeFormat.EAN_8,
-                    ZXing.BarcodeFormat.UPC_A,
-                    ZXing.BarcodeFormat.UPC_E,
-                    ZXing.BarcodeFormat.CODE_128,
-                    ZXing.BarcodeFormat.CODE_39
-                ];
-                hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
-                hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-                codeReader = new ZXing.BrowserMultiFormatReader(hints);
-            }
-
-            try {
-                const constraints = {
-                    video: {
-                        facingMode: "environment",
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 }
-                    }
-                };
-
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
-                currentTrack = stream.getVideoTracks()[0];
-
-                const videoEl = document.getElementById('interactive-video');
-                videoEl.srcObject = stream;
-                await videoEl.play();
-                isCameraRunning = true;
-
-                // إظهار شريط التقريب
-                const zoomArea = document.getElementById('zoom-area');
-                const zoomSlider = document.getElementById('zoom-slider');
-                zoomArea.style.display = 'flex';
-                zoomSlider.value = "1.5"; // بدء الكاميرا بتقريب افتراضي لسهولة القراءة
-                applyZoom(1.5);
-
-                // بدء فك التشفير المستمر
-                codeReader.decodeFromVideoElement(videoEl, (result, err) => {
-                    if (result && isCameraRunning) {
-                        const code = result.getText();
-                        closeScanner();
-                        handleScanResult(code);
-                    }
+            if (!html5QrCode) {
+                // شمل كافة صيغ الباركود التجارية المعروفة لضمان التقاط كود أي علبة
+                html5QrCode = new Html5Qrcode("reader", {
+                    formatsToSupport: [ 
+                        Html5QrcodeSupportedFormats.EAN_13, 
+                        Html5QrcodeSupportedFormats.EAN_8, 
+                        Html5QrcodeSupportedFormats.UPC_A,
+                        Html5QrcodeSupportedFormats.UPC_E,
+                        Html5QrcodeSupportedFormats.CODE_128
+                    ]
                 });
-
-            } catch (err) {
-                console.error("Camera Error:", err);
-                alert("تعذر فتح الكاميرا: " + (err.message || err));
-                closeScanner();
             }
+
+            // إطار واسع ومريح ومعدل مسح سريع
+            const config = { 
+                fps: 25,
+                qrbox: (viewfinderWidth, viewfinderHeight) => {
+                    const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+                    return {
+                        width: Math.floor(minEdge * 0.85),
+                        height: Math.floor(minEdge * 0.55)
+                    };
+                }
+            };
+
+            html5QrCode.start(
+                { facingMode: "environment" }, 
+                config, 
+                onScanSuccess
+            ).then(() => { 
+                isCameraRunning = true; 
+            }).catch(err => {
+                console.error("Camera Error:", err);
+                alert("تعذر تشغيل الكاميرا: " + (err.name || err.message || err));
+                closeScanner();
+            });
         }
 
         function closeScanner() {
-            isCameraRunning = false;
-
-            if (codeReader) {
-                codeReader.reset();
+            if (isCameraRunning && html5QrCode) {
+                html5QrCode.stop().then(() => {
+                    isCameraRunning = false;
+                    document.getElementById('camera-wrapper').style.display = 'none';
+                    document.getElementById('btn-start').style.display = 'flex';
+                }).catch(err => console.error(err));
+            } else {
+                document.getElementById('camera-wrapper').style.display = 'none';
+                document.getElementById('btn-start').style.display = 'flex';
             }
-            if (currentTrack) {
-                currentTrack.stop();
-                currentTrack = null;
-            }
-
-            const videoEl = document.getElementById('interactive-video');
-            if (videoEl.srcObject) {
-                videoEl.srcObject.getTracks().forEach(t => t.stop());
-                videoEl.srcObject = null;
-            }
-            videoEl.style.transform = "scale(1)";
-
-            document.getElementById('zoom-area').style.display = 'none';
-            document.getElementById('camera-wrapper').style.display = 'none';
-            document.getElementById('btn-start').style.display = 'flex';
         }
 
         function handleScanResult(decodedText) {
@@ -694,6 +588,11 @@
                     </button>
                 `;
             }
+        }
+
+        function onScanSuccess(decodedText) {
+            closeScanner();
+            handleScanResult(decodedText);
         }
 
         function processManualScan() {
