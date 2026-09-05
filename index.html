@@ -489,9 +489,9 @@
                 qrbox: { width: 250, height: 150 }
             };
 
-            // تشغيل الكاميرا الخلفية للآيفون بأبسط صيغة قياسية يقبلها Safari
+            // تشغيل الكاميرا بتمرير environment مباشرة كـ string لتوافق سفاري والآيفون
             html5QrCode.start(
-                { facingMode: { ideal: "environment" } }, 
+                { facingMode: "environment" }, 
                 config, 
                 onScanSuccess
             ).then(() => { 
