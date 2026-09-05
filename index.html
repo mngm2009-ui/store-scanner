@@ -77,7 +77,7 @@
             display: none;
             position: relative;
         }
-        #reader { width: 100%; min-height: 280px; }
+        #reader { width: 100%; min-height: 300px; }
 
         .btn-close-cam {
             background: #ef4444;
@@ -302,7 +302,7 @@
 
         <!-- إدخال يدوي -->
         <div class="manual-input-box">
-            <input type="number" id="manual-code" placeholder="أو اكتب رقم الباركود..." onkeydown="if(event.key==='Enter') processManualScan()">
+            <input type="text" id="manual-code" placeholder="أو اكتب رقم الباركود..." onkeydown="if(event.key==='Enter') processManualScan()">
             <button onclick="processManualScan()">إدخال</button>
         </div>
 
@@ -481,27 +481,44 @@
             document.getElementById('btn-start').style.display = 'none';
 
             if (!html5QrCode) {
-                // ضبط المكتبة لقراءة باركود المنتجات التجارية بصرامة
                 html5QrCode = new Html5Qrcode("reader", {
                     formatsToSupport: [ 
                         Html5QrcodeSupportedFormats.EAN_13, 
                         Html5QrcodeSupportedFormats.EAN_8, 
-                        Html5QrcodeSupportedFormats.UPC_A
-                    ]
+                        Html5QrcodeSupportedFormats.UPC_A,
+                        Html5QrcodeSupportedFormats.UPC_E,
+                        Html5QrcodeSupportedFormats.CODE_128,
+                        Html5QrcodeSupportedFormats.CODE_39
+                    ],
+                    verbose: false,
+                    // تفعيل المحرك الأصلي للأجهزة (مهم جداً للآيفون)
+                    experimentalFeatures: {
+                        useBarCodeDetectorIfSupported: true
+                    }
                 });
             }
 
+            // إعداد دقة الكاميرا وإتاحة مساحة مسح أوسع للآيفون
             const config = { 
-                fps: 20, 
-                qrbox: { width: 260, height: 130 }, // إطار مسح ضيق يركز على الخطوط فقط
-                aspectRatio: 1.0,
-                disableFlip: false
+                fps: 15,
+                qrbox: (viewfinderWidth, viewfinderHeight) => {
+                    const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+                    return {
+                        width: Math.floor(minEdge * 0.85),
+                        height: Math.floor(minEdge * 0.45)
+                    };
+                }
             };
 
-            html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
+            const cameraConstraints = {
+                facingMode: "environment",
+                focusMode: "continuous"
+            };
+
+            html5QrCode.start(cameraConstraints, config, onScanSuccess)
                 .then(() => { isCameraRunning = true; })
                 .catch(err => {
-                    alert("يرجى إعطاء صلاحية الكاميرا لمتصفح Safari.");
+                    alert("يرجى إعطاء صلاحية الكاميرا لمتصفح Safari من إعدادات الآيفون.");
                     closeScanner();
                 });
         }
