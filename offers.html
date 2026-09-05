@@ -3,9 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>لوحة التحكم بالعروض والخصومات</title>
+    <title>لوحة التحكم بالعروض والمنتجات</title>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <!-- مكتبة قراءة ملفات Excel (XLSX) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -28,37 +30,55 @@
         h2 { margin: 0 0 6px 0; font-size: 20px; color: #dc2626; }
         #status { font-size: 13px; font-weight: bold; color: #64748b; }
 
+        /* أزرار العمليات الرئيسية */
+        .actions-grid {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
         .btn-scan {
-            width: 100%;
+            flex: 2;
             background: #dc2626;
             color: #ffffff;
             border: none;
-            padding: 16px;
-            font-size: 18px;
+            padding: 14px;
+            font-size: 16px;
             font-weight: bold;
-            border-radius: 14px;
+            border-radius: 12px;
             cursor: pointer;
-            box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
-            margin-bottom: 12px;
+            box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
+            gap: 6px;
         }
-        .btn-scan:active { transform: scale(0.98); background: #b91c1c; }
+        .btn-excel {
+            flex: 1.3;
+            background: #047857;
+            color: #ffffff;
+            border: none;
+            padding: 14px;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 12px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(4, 120, 87, 0.25);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .btn-scan:active, .btn-excel:active { transform: scale(0.98); }
 
-        /* مربع البحث المشترك بالباركود أو الاسم */
+        /* مربع البحث المشترك */
         .search-box-wrapper {
             position: relative;
             margin-bottom: 15px;
         }
-        .input-row {
-            display: flex;
-            gap: 8px;
-        }
+        .input-row { display: flex; gap: 8px; }
         .input-row input {
             flex: 1;
-            padding: 13px;
+            padding: 12px;
             border: 2px solid #cbd5e1;
             border-radius: 12px;
             font-size: 15px;
@@ -70,13 +90,12 @@
             background: #0f172a;
             color: white;
             border: none;
-            padding: 12px 18px;
+            padding: 12px 16px;
             border-radius: 12px;
             font-weight: bold;
             cursor: pointer;
         }
 
-        /* قائمة نتائج البحث بالاسم */
         .search-suggestions {
             position: absolute;
             top: 100%;
@@ -162,11 +181,7 @@
             line-height: 1.6;
         }
 
-        .offer-type-selector {
-            display: flex;
-            gap: 8px;
-            margin: 12px 0;
-        }
+        .offer-type-selector { display: flex; gap: 8px; margin: 12px 0; }
         .type-btn {
             flex: 1;
             padding: 10px;
@@ -225,6 +240,44 @@
             cursor: pointer;
         }
 
+        /* نافذة مراجعة ملف الإكسل */
+        #excel-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+            padding: 15px;
+        }
+        .excel-modal-content {
+            background: #fff;
+            padding: 20px;
+            border-radius: 16px;
+            max-width: 440px;
+            width: 100%;
+            text-align: right;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .excel-preview-list {
+            overflow-y: auto;
+            flex: 1;
+            margin: 12px 0;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 8px;
+            font-size: 13px;
+        }
+        .excel-item-row {
+            padding: 6px 0;
+            border-bottom: 1px solid #f1f5f9;
+            display: flex;
+            justify-content: space-between;
+        }
+
         #toast {
             position: fixed;
             bottom: 20px;
@@ -237,7 +290,7 @@
             font-size: 14px;
             font-weight: bold;
             display: none;
-            z-index: 1000;
+            z-index: 3000;
             box-shadow: 0 4px 14px rgba(0,0,0,0.2);
         }
     </style>
@@ -246,13 +299,20 @@
 
     <div class="container">
         <div class="header">
-            <h2>🏷️ إدارة عروض الأسعار والكميات</h2>
+            <h2>🏷️ إدارة العروض والمنتجات</h2>
             <div id="status">⏳ جاري الاتصال بالجدول...</div>
         </div>
 
-        <button id="btn-open-cam" class="btn-scan" onclick="openScanner()">
-            <span>📷</span> مسح باركود بالكاميرا
-        </button>
+        <!-- أزرار العمليات: كاميرا واستيراد إكسل -->
+        <div class="actions-grid">
+            <button id="btn-open-cam" class="btn-scan" onclick="openScanner()">
+                <span>📷</span> مسح باركود
+            </button>
+            <label class="btn-excel" for="excel-file-input">
+                <span>📊</span> استيراد إكسل
+            </label>
+            <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv" style="display: none;" onchange="handleExcelImport(event)">
+        </div>
 
         <div id="camera-wrapper">
             <div id="reader"></div>
@@ -271,6 +331,21 @@
         <div id="product-card"></div>
     </div>
 
+    <!-- نافذة مراجعة واستيراد الإكسل -->
+    <div id="excel-modal">
+        <div class="excel-modal-content">
+            <h3 style="margin:0 0 6px 0; color:#047857;">📊 معاينة المنتجات المراد رفعها</h3>
+            <div style="font-size:13px; color:#64748b;" id="excel-summary-text">تم العثور على 0 منتج في الملف</div>
+            
+            <div class="excel-preview-list" id="excel-preview-list"></div>
+
+            <div style="display:flex; gap:8px; margin-top:8px;">
+                <button id="btn-confirm-upload" onclick="uploadParsedExcel()" style="flex:2; background:#16a34a; color:#fff; border:none; padding:12px; border-radius:10px; font-weight:bold; cursor:pointer;">🚀 تأكيد ورفع للشيت</button>
+                <button onclick="closeExcelModal()" style="flex:1; background:#64748b; color:#fff; border:none; padding:12px; border-radius:10px; font-weight:bold; cursor:pointer;">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
     <div id="toast"></div>
 
     <script>
@@ -278,6 +353,7 @@
         let html5QrCode = null;
         let isCamRunning = false;
         let selectedOfferType = 'single';
+        let parsedExcelData = [];
 
         const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQCpR9i8vwj3iwcjDyB3xQjx2iTaD3s1kLjYRbwNQW-IOcrdADwRE4mBGbk96pxKGKLYqfbpjVuDLqI/pub?output=csv";
         const webAppUrl = "https://script.google.com/macros/s/AKfycbxkrlCtQUsFsSYWHGLSqQzo1JizU0q6flEYiGjw1UnuMg4oHU1SVUfUv2PAzFGaKZUD/exec";
@@ -303,12 +379,97 @@
         }
         loadSheetData();
 
-        // فحص البحث التلقائي أثناء الكتابة (للاقتراحات بالاسم)
+        // ------------------ قراءة ملف الإكسل ومعالجته ------------------
+        function handleExcelImport(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const data = new Uint8Array(evt.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+                    parsedExcelData = json.map(row => {
+                        // استخراج الحقول بمرونة تامة لجميع المسميات الممكنة
+                        const barcode = String(row.barcode || row.Barcode || row['بار كود'] || row['كود'] || row.Code || row.EAN || '').trim();
+                        const name = String(row.name || row.Name || row.Produkt || row.produkt || row['الاسم'] || row['اسم المنتج'] || '').trim();
+                        const price = String(row.price || row.Price || row.Preis || row.preis || row['السعر'] || '').trim().replace(',', '.');
+                        const offer = String(row.offer || row.Offer || row['العرض'] || row['سعر العرض'] || '').trim().replace(',', '.');
+                        const desc = String(row.desc || row.Beschreibung || row.beschreibung || row['الوصف'] || row['الوزن'] || '').trim();
+
+                        return { barcode, name, price, offer, desc };
+                    }).filter(item => item.barcode !== "");
+
+                    if (parsedExcelData.length === 0) {
+                        alert("لم يتم العثور على أي منتجات صالحة! تأكد أن ملف الإكسل يحتوي على عمود للباركود (barcode).");
+                        return;
+                    }
+
+                    // فتح نافذة المعاينة
+                    document.getElementById('excel-summary-text').innerText = `تم استخراج ${parsedExcelData.length} منتج جاهزة للرفع إلى غوغل شيت`;
+                    let listHtml = '';
+                    parsedExcelData.forEach((item, idx) => {
+                        listHtml += `
+                            <div class="excel-item-row">
+                                <div>
+                                    <b>${idx + 1}. ${item.name || 'بدون اسم'}</b>
+                                    <div style="color:#64748b; font-size:11px;">باركود: ${item.barcode} ${item.desc ? ' | ' + item.desc : ''}</div>
+                                </div>
+                                <div style="font-weight:bold; color:#16a34a;">
+                                    ${item.price ? parseFloat(item.price).toFixed(2) + ' €' : '-'}
+                                    ${item.offer ? '<span style="color:#dc2626; font-size:11px;">(عرض: ' + item.offer + ')</span>' : ''}
+                                </div>
+                            </div>
+                        `;
+                    });
+                    document.getElementById('excel-preview-list').innerHTML = listHtml;
+                    document.getElementById('excel-modal').style.display = 'flex';
+
+                } catch (err) {
+                    alert("خطأ أثناء قراءة ملف الإكسل: " + err.message);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+            e.target.value = ''; // تفريغ حقل الملف
+        }
+
+        function closeExcelModal() {
+            document.getElementById('excel-modal').style.display = 'none';
+        }
+
+        function uploadParsedExcel() {
+            if (parsedExcelData.length === 0) return;
+
+            const btn = document.getElementById('btn-confirm-upload');
+            btn.innerText = "⏳ جاري الرفع للشيت...";
+            btn.disabled = true;
+
+            fetch(webAppUrl, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(parsedExcelData)
+            }).then(() => {
+                closeExcelModal();
+                showToast(`✅ تم رفع وتحديث ${parsedExcelData.length} منتج في غوغل شيت بنجاح!`, 5000);
+                btn.innerText = "🚀 تأكيد ورفع للشيت";
+                btn.disabled = false;
+                loadSheetData(); // إعادة تحديث الذاكرة المحلية
+            }).catch(err => {
+                alert("تعذر الاتصال بـ غوغل شيت: " + err);
+                btn.disabled = false;
+            });
+        }
+
+        // ------------------ البحث والاقتراحات ------------------
         function handleSearchInput() {
             const query = document.getElementById('smart-search').value.trim().toLowerCase();
             const sugBox = document.getElementById('suggestions');
 
-            // إذا كان المدخل فارغاً أو عبارة عن أرقام فقط (باركود)، لا نظهر القائمة المنسدلة
             if (!query || /^\d+$/.test(query)) {
                 sugBox.style.display = 'none';
                 return;
@@ -317,7 +478,7 @@
             const matches = products.filter(p => {
                 const name = (p.Produkt || p.produkt || p.name || p.Name || '').toLowerCase();
                 return name.includes(query);
-            }).slice(0, 6); // أول 6 نتائج
+            }).slice(0, 6);
 
             if (matches.length === 0) {
                 sugBox.style.display = 'none';
@@ -357,14 +518,12 @@
             const query = document.getElementById('smart-search').value.trim();
             if (!query) return;
 
-            // 1. فحص إذا كان باركود
             const cleanQuery = query.replace(/^0+/, '');
             let product = products.find(p => {
                 const b = String(p.Barcode || p.barcode || p['بار كود'] || '').trim().replace(/^0+/, '');
                 return b === cleanQuery;
             });
 
-            // 2. إذا لم يكن باركود، ابحث بالاسم
             if (!product) {
                 product = products.find(p => {
                     const name = (p.Produkt || p.produkt || p.name || p.Name || '').toLowerCase();
@@ -384,6 +543,7 @@
             }
         }
 
+        // ------------------ الكاميرا وتعديل العروض ------------------
         function openScanner() {
             document.getElementById('camera-wrapper').style.display = 'block';
             document.getElementById('btn-open-cam').style.display = 'none';
@@ -549,9 +709,13 @@
         function sendToSheet(barcode, offerValue, successMsg) {
             showToast("⏳ جاري التحديث في غوغل شيت...");
 
+            const target = products.find(p => (p.Barcode || p.barcode || p['بار كود']) === barcode);
             const payload = [{
                 barcode: barcode,
-                offer: offerValue
+                name: target ? (target.Produkt || target.name) : "",
+                price: target ? (target.Preis || target.price) : "",
+                offer: offerValue,
+                desc: target ? (target.Beschreibung || target.desc) : ""
             }];
 
             fetch(webAppUrl, {
@@ -561,10 +725,9 @@
                 body: JSON.stringify(payload)
             }).then(() => {
                 showToast(successMsg);
-                const p = products.find(p => (p.Barcode || p.barcode || p['بار كود']) === barcode);
-                if (p) {
-                    if (p.Offer !== undefined) p.Offer = offerValue;
-                    if (p.offer !== undefined) p.offer = offerValue;
+                if (target) {
+                    if (target.Offer !== undefined) target.Offer = offerValue;
+                    if (target.offer !== undefined) target.offer = offerValue;
                 }
                 displayProduct(barcode);
             }).catch(err => {
@@ -572,7 +735,6 @@
             });
         }
 
-        // إغلاق قائمة الاقتراحات عند الضغط في أي مكان خارجها
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.search-box-wrapper')) {
                 document.getElementById('suggestions').style.display = 'none';
