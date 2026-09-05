@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>لوحة التحكم بالأسعار والعروض</title>
+    <title>إدارة المواد والأسعار والعروض</title>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -12,8 +12,8 @@
         body {
             font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             text-align: center;
-            background-color: #f8fafc;
-            padding: 15px 15px 60px 15px;
+            background-color: #f1f5f9;
+            padding: 15px 15px 70px 15px;
             margin: 0;
             color: #0f172a;
         }
@@ -29,46 +29,38 @@
         h2 { margin: 0 0 6px 0; font-size: 20px; color: #dc2626; }
         #status { font-size: 13px; font-weight: bold; color: #64748b; }
 
-        .actions-grid { display: flex; gap: 8px; margin-bottom: 12px; }
-        .btn-scan {
-            flex: 2;
-            background: #dc2626;
-            color: #ffffff;
+        /* شبكة الأزرار العلوية */
+        .actions-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+        .btn-action {
             border: none;
-            padding: 14px;
-            font-size: 16px;
+            padding: 12px 6px;
+            font-size: 13px;
             font-weight: bold;
             border-radius: 12px;
             cursor: pointer;
-            box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-        }
-        .btn-excel {
-            flex: 1.3;
-            background: #047857;
             color: #ffffff;
-            border: none;
-            padding: 14px;
-            font-size: 14px;
-            font-weight: bold;
-            border-radius: 12px;
-            cursor: pointer;
-            box-shadow: 0 4px 12px rgba(4, 120, 87, 0.25);
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
+            gap: 4px;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.1);
         }
-        .btn-scan:active, .btn-excel:active { transform: scale(0.98); }
+        .btn-scan { background: #dc2626; }
+        .btn-add-quick { background: #2563eb; }
+        .btn-excel { background: #047857; }
+        .btn-action:active { transform: scale(0.97); }
 
+        /* حقل البحث المشترك الذكي */
         .search-box-wrapper { position: relative; margin-bottom: 15px; }
         .input-row { display: flex; gap: 8px; }
         .input-row input {
             flex: 1;
-            padding: 12px;
+            padding: 13px;
             border: 2px solid #cbd5e1;
             border-radius: 12px;
             font-size: 15px;
@@ -135,6 +127,7 @@
             display: block;
         }
 
+        /* كرت تعديل المنتج */
         #product-card {
             background: #ffffff;
             border-radius: 16px;
@@ -146,16 +139,13 @@
             box-shadow: 0 6px 16px rgba(0,0,0,0.05);
         }
 
-        .form-group {
-            margin-bottom: 12px;
-            text-align: right;
-        }
+        .form-group { margin-bottom: 12px; text-align: right; }
         .form-group label {
             display: block;
             font-size: 13px;
             font-weight: bold;
             color: #334155;
-            margin-bottom: 5px;
+            margin-bottom: 4px;
         }
         .form-group input {
             width: 100%;
@@ -167,7 +157,7 @@
         }
         .form-group input:focus { border-color: #2563eb; }
 
-        .price-edit-section {
+        .price-box {
             background: #f8fafc;
             border: 1px solid #e2e8f0;
             border-radius: 12px;
@@ -175,7 +165,7 @@
             margin: 12px 0;
         }
 
-        .offer-type-selector { display: flex; gap: 8px; margin: 8px 0 12px 0; }
+        .offer-type-selector { display: flex; gap: 8px; margin: 8px 0 10px 0; }
         .type-btn {
             flex: 1;
             padding: 8px;
@@ -197,7 +187,7 @@
             padding: 10px;
             border: 2px solid #fda4af;
             border-radius: 8px;
-            font-size: 16px;
+            font-size: 15px;
             font-weight: bold;
             text-align: center;
             outline: none;
@@ -215,7 +205,6 @@
             cursor: pointer;
             margin-top: 10px;
         }
-        .btn-save:active { background: #15803d; }
         .btn-delete-offer {
             width: 100%;
             background: #fee2e2;
@@ -229,7 +218,8 @@
             margin-top: 8px;
         }
 
-        #excel-modal {
+        /* النوافذ المنبثقة (الإضافة السريعة ومعاينة الإكسل) */
+        .modal {
             display: none;
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -239,9 +229,9 @@
             align-items: center;
             padding: 15px;
         }
-        .excel-modal-content {
+        .modal-content {
             background: #fff;
-            padding: 20px;
+            padding: 22px;
             border-radius: 16px;
             max-width: 440px;
             width: 100%;
@@ -249,21 +239,6 @@
             max-height: 85vh;
             display: flex;
             flex-direction: column;
-        }
-        .excel-preview-list {
-            overflow-y: auto;
-            flex: 1;
-            margin: 12px 0;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 8px;
-            font-size: 13px;
-        }
-        .excel-item-row {
-            padding: 6px 0;
-            border-bottom: 1px solid #f1f5f9;
-            display: flex;
-            justify-content: space-between;
         }
 
         #toast {
@@ -287,15 +262,19 @@
 
     <div class="container">
         <div class="header">
-            <h2>🏷️ إدارة الأسعار والعروض</h2>
+            <h2>🏷️ إدارة المواد والأسعار والعروض</h2>
             <div id="status">⏳ جاري الاتصال بالجدول...</div>
         </div>
 
+        <!-- 3 أزرار رئيسية -->
         <div class="actions-grid">
-            <button id="btn-open-cam" class="btn-scan" onclick="openScanner()">
+            <button class="btn-action btn-scan" onclick="openScanner()">
                 <span>📷</span> مسح باركود
             </button>
-            <label class="btn-excel" for="excel-file-input">
+            <button class="btn-action btn-add-quick" onclick="openQuickAddModal()">
+                <span>⚡</span> إضافة سريعة
+            </button>
+            <label class="btn-action btn-excel" for="excel-file-input">
                 <span>📊</span> استيراد إكسل
             </label>
             <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv" style="display: none;" onchange="handleExcelImport(event)">
@@ -306,9 +285,10 @@
             <button class="btn-close" onclick="closeScanner()">إغلاق الكاميرا</button>
         </div>
 
+        <!-- مربع البحث المشترك بالاسم أو الكود -->
         <div class="search-box-wrapper">
             <div class="input-row">
-                <input type="text" id="smart-search" placeholder="🔍 اكتب اسم المنتج أو رقم الباركود..." oninput="handleSearchInput()" onkeydown="if(event.key==='Enter') executeSearch()">
+                <input type="text" id="smart-search" placeholder="🔍 اكتب اسم المادة أو رقم الباركود..." oninput="handleSearchInput()" onkeydown="if(event.key==='Enter') executeSearch()">
                 <button onclick="executeSearch()">بحث</button>
             </div>
             <div id="suggestions" class="search-suggestions"></div>
@@ -317,12 +297,45 @@
         <div id="product-card"></div>
     </div>
 
-    <div id="excel-modal">
-        <div class="excel-modal-content">
+    <!-- نافذة الإضافة السريعة على الطاير -->
+    <div id="quick-add-modal" class="modal">
+        <div class="modal-content">
+            <h3 style="margin:0 0 12px 0; color:#2563eb;">⚡ إضافة مادة جديدة على الطاير</h3>
+            
+            <div class="form-group">
+                <label>اسم المادة (*):</label>
+                <input type="text" id="qa-name" placeholder="مثال: حمص بطحينة">
+            </div>
+
+            <div class="form-group">
+                <label>الوزن أو الحجم:</label>
+                <input type="text" id="qa-desc" placeholder="مثال: 400 g أو 1 لتر">
+            </div>
+
+            <div class="form-group">
+                <label>السعر الأساسي (€) (*):</label>
+                <input type="number" step="0.01" id="qa-price" placeholder="مثال: 2.50">
+            </div>
+
+            <div class="form-group">
+                <label>الباركود (اتركه فارغاً إذا لا يوجد):</label>
+                <input type="text" id="qa-barcode" placeholder="اختياري - يولد تلقائياً عند تركه فارغاً">
+            </div>
+
+            <div style="display:flex; gap:8px; margin-top:10px;">
+                <button onclick="saveQuickAdd()" style="flex:2; background:#16a34a; color:#fff; border:none; padding:12px; border-radius:10px; font-weight:bold; cursor:pointer;">💾 حفظ وإضافة للشيت</button>
+                <button onclick="closeQuickAddModal()" style="flex:1; background:#64748b; color:#fff; border:none; padding:12px; border-radius:10px; font-weight:bold; cursor:pointer;">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة معاينة الإكسل قبل الرفع -->
+    <div id="excel-modal" class="modal">
+        <div class="modal-content">
             <h3 style="margin:0 0 6px 0; color:#047857;">📊 معاينة المنتجات المراد رفعها</h3>
-            <div style="font-size:13px; color:#64748b;" id="excel-summary-text">تم العثور على 0 منتج في الملف</div>
-            <div class="excel-preview-list" id="excel-preview-list"></div>
-            <div style="display:flex; gap:8px; margin-top:8px;">
+            <div style="font-size:13px; color:#64748b;" id="excel-summary-text">0 منتج</div>
+            <div style="overflow-y:auto; flex:1; margin:12px 0; border:1px solid #e2e8f0; border-radius:8px; padding:8px;" id="excel-preview-list"></div>
+            <div style="display:flex; gap:8px;">
                 <button id="btn-confirm-upload" onclick="uploadParsedExcel()" style="flex:2; background:#16a34a; color:#fff; border:none; padding:12px; border-radius:10px; font-weight:bold; cursor:pointer;">🚀 تأكيد ورفع للشيت</button>
                 <button onclick="closeExcelModal()" style="flex:1; background:#64748b; color:#fff; border:none; padding:12px; border-radius:10px; font-weight:bold; cursor:pointer;">إلغاء</button>
             </div>
@@ -348,22 +361,29 @@
             setTimeout(() => { toast.style.display = 'none'; }, duration);
         }
 
+        function norm(s) { return String(s || '').trim().toLowerCase().replace(/\s+/g, ' '); }
+
         function loadSheetData() {
             Papa.parse(sheetUrl, {
                 download: true,
                 header: true,
                 skipEmptyLines: true,
                 complete: function(results) {
-                    products = results.data.filter(p => p.Barcode || p.barcode || p['بار كود'] || p['BARCODE']);
-                    document.getElementById('status').innerText = `✅ متصل بالشيت (${products.length} منتج مسجل)`;
+                    products = results.data.filter(p => {
+                        const name = p.Produkt || p.produkt || p.name || p.Name;
+                        const code = p.Barcode || p.barcode || p['بار كود'];
+                        return name || code;
+                    });
+                    document.getElementById('status').innerText = `✅ متصل بالشيت (${products.length} مادة مسجلة)`;
                     document.getElementById('status').style.color = "#16a34a";
                 }
             });
         }
         loadSheetData();
 
+        // ------------------ البحث والاقتراحات ------------------
         function handleSearchInput() {
-            const query = document.getElementById('smart-search').value.trim().toLowerCase();
+            const query = norm(document.getElementById('smart-search').value);
             const sugBox = document.getElementById('suggestions');
 
             if (!query || /^\d+$/.test(query)) {
@@ -372,7 +392,7 @@
             }
 
             const matches = products.filter(p => {
-                const name = (p.Produkt || p.produkt || p.name || p.Name || '').toLowerCase();
+                const name = norm(p.Produkt || p.produkt || p.name || p.Name);
                 return name.includes(query);
             }).slice(0, 6);
 
@@ -389,10 +409,10 @@
                 const desc = item.Beschreibung || item.beschreibung || item.desc || '';
 
                 html += `
-                    <div class="suggestion-item" onclick="selectSuggestedProduct('${code}')">
+                    <div class="suggestion-item" onclick="selectSuggestedProduct('${code}', '${name.replace(/'/g, "\\'")}', '${desc.replace(/'/g, "\\'")}')">
                         <div>
                             <div class="suggestion-name">${name}</div>
-                            <div class="suggestion-sub">${desc ? desc + ' | ' : ''}باركود: ${code}</div>
+                            <div class="suggestion-sub">${desc ? '⚖️ ' + desc + ' | ' : ''}${code ? 'كود: ' + code : 'بدون كود'}</div>
                         </div>
                         <div style="font-weight:bold; color:#16a34a;">${price} €</div>
                     </div>
@@ -403,49 +423,43 @@
             sugBox.style.display = 'block';
         }
 
-        function selectSuggestedProduct(code) {
+        function selectSuggestedProduct(code, name, desc) {
             document.getElementById('suggestions').style.display = 'none';
             document.getElementById('smart-search').value = '';
-            displayProduct(code);
+            displayProduct(code, name, desc);
         }
 
         function executeSearch() {
             document.getElementById('suggestions').style.display = 'none';
-            const query = document.getElementById('smart-search').value.trim();
+            const query = norm(document.getElementById('smart-search').value);
             if (!query) return;
 
-            const cleanQuery = query.replace(/^0+/, '');
-            let product = products.find(p => {
-                const b = String(p.Barcode || p.barcode || p['بار كود'] || '').trim().replace(/^0+/, '');
-                return b === cleanQuery;
-            });
+            // 1. بحث بالباركود
+            let product = products.find(p => norm(p.Barcode || p.barcode || p['بار كود']) === query.replace(/^0+/, ''));
 
+            // 2. بحث بالاسم
             if (!product) {
-                product = products.find(p => {
-                    const name = (p.Produkt || p.produkt || p.name || p.Name || '').toLowerCase();
-                    return name.includes(query.toLowerCase());
-                });
+                product = products.find(p => norm(p.Produkt || p.produkt || p.name || p.Name).includes(query));
             }
 
             if (product) {
                 const code = product.Barcode || product.barcode || product['بار كود'] || '';
-                displayProduct(code);
+                const name = product.Produkt || product.produkt || product.name || product.Name || '';
+                const desc = product.Beschreibung || product.beschreibung || product.desc || '';
+                displayProduct(code, name, desc);
                 document.getElementById('smart-search').value = '';
             } else {
                 const card = document.getElementById('product-card');
                 card.style.display = 'block';
                 card.style.borderColor = '#dc2626';
-                card.innerHTML = `<div style="color:#dc2626; font-weight:bold;">❌ لم يتم العثور على أي منتج يطابق: "${query}"</div>`;
+                card.innerHTML = `<div style="color:#dc2626; font-weight:bold;">❌ لم يتم العثور على أي مادة تطابق: "${query}"</div>`;
             }
         }
 
+        // ------------------ الكاميرا ------------------
         function openScanner() {
             document.getElementById('camera-wrapper').style.display = 'block';
-            document.getElementById('btn-open-cam').style.display = 'none';
-
-            if (!html5QrCode) {
-                html5QrCode = new Html5Qrcode("reader");
-            }
+            if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
 
             html5QrCode.start(
                 { facingMode: "environment" },
@@ -455,10 +469,7 @@
                     displayProduct(decodedText);
                 }
             ).then(() => { isCamRunning = true; })
-            .catch(err => {
-                alert("تعذر فتح الكاميرا");
-                closeScanner();
-            });
+            .catch(() => { closeScanner(); });
         }
 
         function closeScanner() {
@@ -466,14 +477,13 @@
                 html5QrCode.stop().then(() => {
                     isCamRunning = false;
                     document.getElementById('camera-wrapper').style.display = 'none';
-                    document.getElementById('btn-open-cam').style.display = 'flex';
                 });
             } else {
                 document.getElementById('camera-wrapper').style.display = 'none';
-                document.getElementById('btn-open-cam').style.display = 'flex';
             }
         }
 
+        // ------------------ عرض بيانات المنتج وتعديله ------------------
         function parseOfferString(offerStr) {
             if (!offerStr) return null;
             const str = String(offerStr).trim();
@@ -488,29 +498,26 @@
             selectedOfferType = type;
             document.getElementById('type-single').classList.toggle('active', type === 'single');
             document.getElementById('type-bundle').classList.toggle('active', type === 'bundle');
-            
-            const bundleBox = document.getElementById('bundle-qty-box');
-            if (type === 'bundle') {
-                bundleBox.style.display = 'block';
-                document.getElementById('offer-price-label').innerText = "السعر الإجمالي للكمية (€):";
-            } else {
-                bundleBox.style.display = 'none';
-                document.getElementById('offer-price-label').innerText = "سعر العرض للقطعة الواحدة (€):";
-            }
+            document.getElementById('bundle-qty-box').style.display = (type === 'bundle') ? 'block' : 'none';
+            document.getElementById('offer-price-label').innerText = (type === 'bundle') ? 'سعر الحزمة بالكامل (€):' : 'سعر العرض للقطعة الواحدة (€):';
         }
 
-        function displayProduct(code) {
+        function displayProduct(code, nameHint = '', descHint = '') {
             const card = document.getElementById('product-card');
-            const cleanCode = String(code).trim().replace(/^0+/, '');
-            const item = products.find(p => {
-                const b = String(p.Barcode || p.barcode || p['بار كود'] || '').trim().replace(/^0+/, '');
-                return b === cleanCode;
-            });
+            
+            // مطابقة ذكية
+            let item = null;
+            if (code) {
+                item = products.find(p => norm(p.Barcode || p.barcode || p['بار كود']) === norm(code));
+            }
+            if (!item && nameHint) {
+                item = products.find(p => norm(p.Produkt || p.name) === norm(nameHint) && norm(p.Beschreibung || p.desc) === norm(descHint));
+            }
 
             if (!item) {
                 card.style.display = 'block';
                 card.style.borderColor = '#dc2626';
-                card.innerHTML = `<div style="color:#dc2626; font-weight:bold;">❌ هذا المنتج غير مسجل في الشيت: (${code})</div>`;
+                card.innerHTML = `<div style="color:#dc2626; font-weight:bold;">❌ هذه المادة غير مسجلة في الشيت!</div>`;
                 return;
             }
 
@@ -526,10 +533,12 @@
             card.style.display = 'block';
             card.style.borderColor = '#e2e8f0';
             card.innerHTML = `
-                <div style="font-size: 13px; color: #64748b; margin-bottom: 6px;">باركود: <b>${barcode}</b></div>
+                <div style="font-size: 13px; color: #64748b; margin-bottom: 6px;">
+                    الباركود: <b>${barcode || '<span style="color:#d97706;">بدون كود (معرف تلقائي)</span>'}</b>
+                </div>
 
                 <div class="form-group">
-                    <label>اسم المنتج:</label>
+                    <label>اسم المادة:</label>
                     <input type="text" id="edit-name" value="${name}">
                 </div>
 
@@ -538,7 +547,12 @@
                     <input type="text" id="edit-desc" value="${desc}">
                 </div>
 
-                <div class="price-edit-section">
+                <div class="form-group">
+                    <label>الباركود (يمكنك تغييره أو تركه):</label>
+                    <input type="text" id="edit-barcode" value="${barcode}">
+                </div>
+
+                <div class="price-box">
                     <div class="form-group" style="margin-bottom:8px;">
                         <label style="color:#0f172a; font-size:14px;">💵 السعر الأساسي للمنتج (€):</label>
                         <input type="number" step="0.01" id="edit-base-price" value="${price}" style="font-size:18px; font-weight:bold; color:#16a34a; text-align:center;">
@@ -546,7 +560,7 @@
 
                     <hr style="border:none; border-top:1px dashed #cbd5e1; margin:12px 0;">
 
-                    <label style="font-size:13px; font-weight:bold; color:#dc2626;">🔥 إعداد سعر العرض (اختياري):</label>
+                    <label style="font-size:13px; font-weight:bold; color:#dc2626;">🔥 إعداد سعر العرض:</label>
                     
                     <div class="offer-type-selector">
                         <button type="button" id="type-single" class="type-btn ${selectedOfferType==='single'?'active':''}" onclick="setOfferType('single')">قطعة واحدة</button>
@@ -555,33 +569,32 @@
 
                     <div style="text-align:right; margin-bottom:4px;">
                         <span id="offer-price-label" style="font-size:12px; font-weight:bold; color:#475569;">
-                            ${selectedOfferType==='bundle' ? 'السعر الإجمالي للكمية (€):' : 'سعر العرض للقطعة الواحدة (€):'}
+                            ${selectedOfferType==='bundle' ? 'سعر الحزمة بالكامل (€):' : 'سعر العرض للقطعة الواحدة (€):'}
                         </span>
                     </div>
 
                     <div class="offer-inputs">
                         <input type="number" step="0.01" id="edit-offer-price" style="flex:2;" placeholder="سعر العرض (€)" value="${parsedOffer ? parsedOffer.price : ''}">
-                        
                         <div id="bundle-qty-box" style="display:${selectedOfferType==='bundle'?'block':'none'}; flex:1.2;">
                             <input type="number" min="2" id="edit-offer-qty" placeholder="الكمية" value="${(parsedOffer && parsedOffer.isBundle) ? parsedOffer.qty : '3'}">
                         </div>
                     </div>
                 </div>
 
-                <button class="btn-save" onclick="saveAllChanges('${barcode}')">💾 حفظ التعديلات في الشيت</button>
-                ${rawOffer ? `<button class="btn-delete-offer" onclick="clearProductOffer('${barcode}')">🗑️ إزالة العرض الحالي فقط</button>` : ''}
+                <button class="btn-save" onclick="saveAllChanges('${barcode}')">💾 حفظ جميع التعديلات في الشيت</button>
+                ${rawOffer ? `<button class="btn-delete-offer" onclick="clearProductOffer('${barcode}')">🗑️ إزالة العرض وتصفيره</button>` : ''}
             `;
         }
 
-        // حفظ السعر الأساسي والعرض والاسم دفعة واحدة
-        function saveAllChanges(barcode) {
+        function saveAllChanges(originalBarcode) {
             const nameVal = document.getElementById('edit-name').value.trim();
             const descVal = document.getElementById('edit-desc').value.trim();
+            const barcodeVal = document.getElementById('edit-barcode').value.trim() || originalBarcode;
             const basePriceVal = document.getElementById('edit-base-price').value.trim();
             const offerPriceVal = document.getElementById('edit-offer-price').value.trim();
 
-            if (!basePriceVal || isNaN(parseFloat(basePriceVal))) {
-                alert("يرجى كتابة سعر أساسي صحيح للمنتج.");
+            if (!nameVal || !basePriceVal || isNaN(parseFloat(basePriceVal))) {
+                alert("يرجى كتابة الاسم وسعر أساسي صحيح للمادة.");
                 return;
             }
 
@@ -590,7 +603,7 @@
                 if (selectedOfferType === 'bundle') {
                     const qtyVal = parseInt(document.getElementById('edit-offer-qty').value.trim());
                     if (!qtyVal || qtyVal < 2) {
-                        alert("يرجى كتابة كمية حزمة صحيحة (2 فأكثر)");
+                        alert("يرجى تحديد كمية صحيحة للحزمة");
                         return;
                     }
                     finalOfferPayload = `${qtyVal}@${parseFloat(offerPriceVal).toFixed(2)}`;
@@ -600,14 +613,14 @@
             }
 
             const payload = [{
-                barcode: barcode,
+                barcode: barcodeVal,
                 name: nameVal,
                 price: parseFloat(basePriceVal).toFixed(2),
                 offer: finalOfferPayload,
                 desc: descVal
             }];
 
-            showToast("⏳ جاري حفظ وتحديث البيانات في غوغل شيت...");
+            showToast("⏳ جاري حفظ التعديلات في غوغل شيت...");
 
             fetch(webAppUrl, {
                 method: 'POST',
@@ -615,32 +628,64 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             }).then(() => {
-                showToast("✅ تم حفظ وتحديث المنتج في الشيت بنجاح!");
-                
-                // تحديث الذاكرة المحلية
-                const p = products.find(p => (p.Barcode || p.barcode || p['بار كود']) === barcode);
-                if (p) {
-                    if (p.Produkt !== undefined) p.Produkt = nameVal;
-                    if (p.name !== undefined) p.name = nameVal;
-                    if (p.Preis !== undefined) p.Preis = basePriceVal;
-                    if (p.price !== undefined) p.price = basePriceVal;
-                    if (p.Beschreibung !== undefined) p.Beschreibung = descVal;
-                    if (p.desc !== undefined) p.desc = descVal;
-                    if (p.Offer !== undefined) p.Offer = finalOfferPayload;
-                    if (p.offer !== undefined) p.offer = finalOfferPayload;
-                }
-                displayProduct(barcode);
+                showToast("✅ تم حفظ التعديلات في الشيت بنجاح!");
+                loadSheetData();
             }).catch(err => {
-                alert("تعذر الاتصال بـ غوغل شيت: " + err);
+                alert("خطأ: " + err);
             });
         }
 
-        // مسح سعر العرض فقط والإبقاء على السعر الأساسي
         function clearProductOffer(barcode) {
             document.getElementById('edit-offer-price').value = '';
             saveAllChanges(barcode);
         }
 
+        // ------------------ نافذة الإضافة السريعة ------------------
+        function openQuickAddModal() {
+            document.getElementById('quick-add-modal').style.display = 'flex';
+        }
+        function closeQuickAddModal() {
+            document.getElementById('quick-add-modal').style.display = 'none';
+        }
+
+        function saveQuickAdd() {
+            const name = document.getElementById('qa-name').value.trim();
+            const desc = document.getElementById('qa-desc').value.trim();
+            const price = document.getElementById('qa-price').value.trim();
+            const barcode = document.getElementById('qa-barcode').value.trim();
+
+            if (!name || !price || isNaN(parseFloat(price))) {
+                alert("يرجى كتابة اسم المادة وسعرها على الأقل!");
+                return;
+            }
+
+            showToast("⏳ جاري إضافة المادة للشيت...");
+
+            const payload = [{
+                barcode: barcode,
+                name: name,
+                price: parseFloat(price).toFixed(2),
+                desc: desc,
+                offer: ""
+            }];
+
+            fetch(webAppUrl, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).then(() => {
+                closeQuickAddModal();
+                showToast(`✅ تمت إضافة المادة "${name}" بنجاح!`, 4000);
+                document.getElementById('qa-name').value = '';
+                document.getElementById('qa-desc').value = '';
+                document.getElementById('qa-price').value = '';
+                document.getElementById('qa-barcode').value = '';
+                loadSheetData();
+            }).catch(err => alert(err));
+        }
+
+        // ------------------ استيراد الإكسل بالمطابقة الذكية ------------------
         function handleExcelImport(e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -650,37 +695,33 @@
                 try {
                     const data = new Uint8Array(evt.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
-                    const firstSheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[firstSheetName];
+                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
                     const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
                     parsedExcelData = json.map(row => {
-                        const barcode = String(row.barcode || row.Barcode || row['بار كود'] || row['كود'] || row.Code || row.EAN || '').trim();
+                        const barcode = String(row.barcode || row.Barcode || row['بار كود'] || row['كود'] || '').trim();
                         const name = String(row.name || row.Name || row.Produkt || row.produkt || row['الاسم'] || row['اسم المنتج'] || '').trim();
                         const price = String(row.price || row.Price || row.Preis || row.preis || row['السعر'] || '').trim().replace(',', '.');
-                        const offer = String(row.offer || row.Offer || row['العرض'] || row['سعر العرض'] || '').trim().replace(',', '.');
+                        const offer = String(row.offer || row.Offer || row['العرض'] || '').trim().replace(',', '.');
                         const desc = String(row.desc || row.Beschreibung || row.beschreibung || row['الوصف'] || row['الوزن'] || '').trim();
                         return { barcode, name, price, offer, desc };
-                    }).filter(item => item.barcode !== "");
+                    }).filter(item => item.name !== ""); // يقبل كل مادة لها اسم
 
                     if (parsedExcelData.length === 0) {
-                        alert("لم يتم العثور على أي منتجات صالحة في ملف الإكسل.");
+                        alert("لم يتم العثور على مواد لها أسماء في الملف!");
                         return;
                     }
 
-                    document.getElementById('excel-summary-text').innerText = `تم استخراج ${parsedExcelData.length} منتج جاهزة للرفع إلى غوغل شيت`;
+                    document.getElementById('excel-summary-text').innerText = `تم فحص ${parsedExcelData.length} مادة للمطابقة والتحديث`;
                     let listHtml = '';
                     parsedExcelData.forEach((item, idx) => {
                         listHtml += `
-                            <div class="excel-item-row">
+                            <div style="padding:6px 0; border-bottom:1px solid #f1f5f9; display:flex; justify-content:space-between; font-size:12px;">
                                 <div>
-                                    <b>${idx + 1}. ${item.name || 'بدون اسم'}</b>
-                                    <div style="color:#64748b; font-size:11px;">باركود: ${item.barcode} ${item.desc ? ' | ' + item.desc : ''}</div>
+                                    <b>${idx + 1}. ${item.name}</b>
+                                    <div style="color:#64748b;">${item.desc ? '⚖️ ' + item.desc : 'بدون وزن'} | ${item.barcode ? 'كود: ' + item.barcode : '<span style="color:#d97706;">(مطابقة ذكية بالاسم+الوزن)</span>'}</div>
                                 </div>
-                                <div style="font-weight:bold; color:#16a34a;">
-                                    ${item.price ? parseFloat(item.price).toFixed(2) + ' €' : '-'}
-                                    ${item.offer ? '<span style="color:#dc2626; font-size:11px;">(عرض: ' + item.offer + ')</span>' : ''}
-                                </div>
+                                <div style="font-weight:bold; color:#16a34a;">${item.price ? parseFloat(item.price).toFixed(2) + ' €' : '-'}</div>
                             </div>
                         `;
                     });
@@ -688,20 +729,16 @@
                     document.getElementById('excel-modal').style.display = 'flex';
 
                 } catch (err) {
-                    alert("خطأ أثناء قراءة ملف الإكسل: " + err.message);
+                    alert("خطأ: " + err.message);
                 }
             };
             reader.readAsArrayBuffer(file);
             e.target.value = '';
         }
 
-        function closeExcelModal() {
-            document.getElementById('excel-modal').style.display = 'none';
-        }
+        function closeExcelModal() { document.getElementById('excel-modal').style.display = 'none'; }
 
         function uploadParsedExcel() {
-            if (parsedExcelData.length === 0) return;
-
             const btn = document.getElementById('btn-confirm-upload');
             btn.innerText = "⏳ جاري الرفع للشيت...";
             btn.disabled = true;
@@ -713,12 +750,12 @@
                 body: JSON.stringify(parsedExcelData)
             }).then(() => {
                 closeExcelModal();
-                showToast(`✅ تم تحديث ${parsedExcelData.length} منتج في الشيت بنجاح!`, 5000);
+                showToast(`✅ تم تحديث ورفع ${parsedExcelData.length} مادة بمطابقة الاسم والوزن!`, 5000);
                 btn.innerText = "🚀 تأكيد ورفع للشيت";
                 btn.disabled = false;
                 loadSheetData();
             }).catch(err => {
-                alert("تعذر الاتصال بـ غوغل شيت: " + err);
+                alert("خطأ: " + err);
                 btn.disabled = false;
             });
         }
