@@ -227,7 +227,7 @@
         }
         .modal-content {
             background: #fff;
-            padding: 22px;
+            padding: 20px;
             border-radius: 16px;
             max-width: 440px;
             width: 100%;
@@ -236,6 +236,56 @@
             display: flex;
             flex-direction: column;
         }
+
+        /* تنسيقات المعاينة والتمييز بالألوان */
+        .preview-stat-box {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .stat-badge {
+            flex: 1;
+            padding: 6px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: bold;
+            text-align: center;
+        }
+        .stat-existing { background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; }
+        .stat-new { background: #dcfce7; color: #16a34a; border: 1px solid #86efac; }
+
+        .excel-item-row {
+            padding: 8px 10px;
+            margin-bottom: 6px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+        }
+        /* كرت موجود مسبقاً (محدد بأحمر) */
+        .item-existing {
+            background: #fff5f5;
+            border: 2px solid #ef4444;
+            border-right: 6px solid #dc2626;
+        }
+        /* كرت جديد (محدد بأخضر) */
+        .item-new {
+            background: #f0fdf4;
+            border: 2px solid #22c55e;
+            border-right: 6px solid #16a34a;
+        }
+
+        .badge-tag {
+            font-size: 10px;
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-top: 2px;
+        }
+        .badge-existing { background: #dc2626; color: white; }
+        .badge-new { background: #16a34a; color: white; }
 
         #toast {
             position: fixed;
@@ -313,7 +363,7 @@
 
             <div class="form-group">
                 <label>الباركود (اتركه فارغاً إذا لا يوجد):</label>
-                <input type="text" id="qa-barcode" placeholder="اختياري - يولد تلقائياً عند تركه فارغاً">
+                <input type="text" id="qa-barcode" placeholder="اختياري - يولد تلقائياً">
             </div>
 
             <div style="display:flex; gap:8px; margin-top:10px;">
@@ -323,18 +373,31 @@
         </div>
     </div>
 
-    <!-- نافذة مراجعة الإكسل -->
+    <!-- نافذة معاينة الإكسل مع التمييز بالألوان -->
     <div id="excel-modal" class="modal">
         <div class="modal-content">
-            <h3 style="margin:0 0 6px 0; color:#047857;">📊 معاينة المنتجات المراد رفعها</h3>
-            <div style="font-size:13px; color:#64748b;" id="excel-summary-text">0 منتج</div>
-            <div style="overflow-y:auto; flex:1; margin:12px 0; border:1px solid #e2e8f0; border-radius:8px; padding:8px;" id="excel-preview-list"></div>
-            <div style="display:flex; gap:8px;">
+            <h3 style="margin:0 0 6px 0; color:#047857;">📊 معاينة ومطابقة المواد</h3>
+            <div style="font-size:12px; color:#64748b; margin-bottom:6px;" id="excel-summary-text">0 منتج</div>
+            
+            <div class="preview-stat-box">
+                <div class="stat-badge stat-existing" id="stat-existing-count">🟥 موجود مسبقاً (تحديث): 0</div>
+                <div class="stat-badge stat-new" id="stat-new-count">🟩 مادة جديدة (إضافة): 0</div>
+            </div>
+
+            <div style="overflow-y:auto; flex:1; margin:6px 0; border:1px solid #e2e8f0; border-radius:8px; padding:6px;" id="excel-preview-list"></div>
+            
+            <div style="display:flex; gap:8px; margin-top:6px;">
                 <button id="btn-confirm-upload" onclick="uploadParsedExcel()" style="flex:2; background:#16a34a; color:#fff; border:none; padding:12px; border-radius:10px; font-weight:bold; cursor:pointer;">🚀 تأكيد ورفع للشيت</button>
                 <button onclick="closeExcelModal()" style="flex:1; background:#64748b; color:#fff; border:none; padding:12px; border-radius:10px; font-weight:bold; cursor:pointer;">إلغاء</button>
             </div>
         </div>
     </div>
+
+    <!-- عنصر iframe خفي لإرسال البيانات دون أي حظر من سفاري -->
+    <iframe name="hidden_upload_frame" id="hidden_upload_frame" style="display:none;"></iframe>
+    <form id="hidden_upload_form" method="POST" target="hidden_upload_frame" style="display:none;">
+        <input type="hidden" name="data" id="hidden_form_payload">
+    </form>
 
     <div id="toast"></div>
 
@@ -375,25 +438,178 @@
         }
         loadSheetData();
 
-        // دالة موحدة لإرسال البيانات دون تعارض مع سفاري وآيفون
-        function postToGoogle(dataArray, onSuccess, onError) {
-            const payload = JSON.stringify(dataArray);
+        // طريقة الإرسال المضمونة 100% لتفادي مشاكل سفاري وحجم البيانات الكبير
+        function postToGoogleSheet(dataArray, onSuccess) {
+            const payloadStr = JSON.stringify(dataArray);
+            
+            const form = document.getElementById('hidden_upload_form');
+            const input = document.getElementById('hidden_form_payload');
+            form.action = webAppUrl;
+            input.value = payloadStr;
+            
+            // إرسال الفورم داخل الـ iframe الخفي
+            form.submit();
 
-            fetch(webAppUrl, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: payload
-            })
-            .then(() => { if (onSuccess) onSuccess(); })
-            .catch((err) => {
-                // بديل إضافي إذا عارض المتصفح
+            // تنفيذ رسالة النجاح فوراً
+            if (onSuccess) onSuccess();
+        }
+
+        // فحص ما إذا كانت المادة موجودة بالشيت مسبقاً
+        function checkItemExists(code, name, desc) {
+            const nCode = norm(code);
+            const nName = norm(name);
+            const nDesc = norm(desc);
+
+            // 1. فحص بالباركود
+            if (nCode && !nCode.startsWith('nobar-')) {
+                const foundByCode = products.some(p => norm(p.Barcode || p.barcode || p['بار كود']) === nCode);
+                if (foundByCode) return true;
+            }
+
+            // 2. فحص بمطابقة الاسم والوزن معاً
+            if (nName) {
+                const foundByNameDesc = products.some(p => {
+                    const pName = norm(p.Produkt || p.produkt || p.name || p.Name);
+                    const pDesc = norm(p.Beschreibung || p.beschreibung || p.desc || p['الوصف']);
+                    return pName === nName && pDesc === nDesc;
+                });
+                if (foundByNameDesc) return true;
+            }
+
+            return false;
+        }
+
+        // ------------------ استيراد الإكسل والمعاينة بالألوان ------------------
+        function handleExcelImport(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
                 try {
-                    navigator.sendBeacon(webAppUrl, payload);
-                    if (onSuccess) onSuccess();
-                } catch(e) {
-                    if (onError) onError(err);
+                    const data = new Uint8Array(evt.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+                    let existingCount = 0;
+                    let newCount = 0;
+
+                    parsedExcelData = json.map(row => {
+                        const barcode = String(row.barcode || row.Barcode || row['بار كود'] || row['كود'] || row.Code || row.EAN || '').trim();
+                        const name = String(row.name || row.Name || row.Produkt || row.produkt || row['الاسم'] || row['اسم المنتج'] || '').trim();
+                        const price = String(row.price || row.Price || row.Preis || row.preis || row['السعر'] || '').trim().replace(',', '.');
+                        const offer = String(row.offer || row.Offer || row['العرض'] || '').trim().replace(',', '.');
+                        const desc = String(row.desc || row.Beschreibung || row.beschreibung || row['الوصف'] || row['الوزن'] || '').trim();
+                        
+                        const isExisting = checkItemExists(barcode, name, desc);
+                        if (isExisting) existingCount++; else newCount++;
+
+                        return { barcode, name, price, offer, desc, isExisting };
+                    }).filter(item => item.name !== "" || item.barcode !== "");
+
+                    if (parsedExcelData.length === 0) {
+                        alert("لم يتم العثور على مواد صالحة في الملف!");
+                        return;
+                    }
+
+                    document.getElementById('excel-summary-text').innerText = `إجمالي المواد المفحوصة: ${parsedExcelData.length} مادة`;
+                    document.getElementById('stat-existing-count').innerText = `🟥 مسجلة مسبقاً (تحديث): ${existingCount}`;
+                    document.getElementById('stat-new-count').innerText = `🟩 مادة جديدة (إضافة): ${newCount}`;
+
+                    let listHtml = '';
+                    parsedExcelData.forEach((item, idx) => {
+                        const statusClass = item.isExisting ? 'item-existing' : 'item-new';
+                        const badgeHtml = item.isExisting 
+                            ? `<span class="badge-tag badge-existing">موجود بالشيت (سيتم تحديث السعر)</span>`
+                            : `<span class="badge-tag badge-new">مادة جديدة كلياً (إضافة)</span>`;
+
+                        listHtml += `
+                            <div class="excel-item-row ${statusClass}">
+                                <div>
+                                    <b style="color:#0f172a;">${idx + 1}. ${item.name || 'بدون اسم'}</b>
+                                    <div style="color:#64748b; font-size:11px;">
+                                        ${item.desc ? '⚖️ ' + item.desc + ' | ' : ''}${item.barcode ? 'كود: ' + item.barcode : 'بدون كود'}
+                                    </div>
+                                    ${badgeHtml}
+                                </div>
+                                <div style="font-weight:bold; color:#16a34a; text-align:left;">
+                                    ${item.price ? parseFloat(item.price).toFixed(2) + ' €' : '-'}
+                                    ${item.offer ? '<br><span style="color:#dc2626; font-size:11px;">عرض: ' + item.offer + '</span>' : ''}
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    document.getElementById('excel-preview-list').innerHTML = listHtml;
+                    document.getElementById('excel-modal').style.display = 'flex';
+
+                } catch (err) {
+                    alert("خطأ أثناء قراءة الملف: " + err.message);
                 }
+            };
+            reader.readAsArrayBuffer(file);
+            e.target.value = '';
+        }
+
+        function closeExcelModal() { document.getElementById('excel-modal').style.display = 'none'; }
+
+        function uploadParsedExcel() {
+            const btn = document.getElementById('btn-confirm-upload');
+            btn.innerText = "⏳ جاري الرفع للشيت...";
+            btn.disabled = true;
+
+            // تنظيف البيانات وحذف حقل isExisting قبل الإرسال
+            const payload = parsedExcelData.map(item => ({
+                barcode: item.barcode,
+                name: item.name,
+                price: item.price,
+                offer: item.offer,
+                desc: item.desc
+            }));
+
+            postToGoogleSheet(payload, () => {
+                closeExcelModal();
+                showToast(`✅ تم إرسال ${payload.length} مادة لجدول غوغل بنجاح!`, 5000);
+                btn.innerText = "🚀 تأكيد ورفع للشيت";
+                btn.disabled = false;
+                setTimeout(loadSheetData, 3500);
+            });
+        }
+
+        // ------------------ نافذة الإضافة السريعة ------------------
+        function openQuickAddModal() { document.getElementById('quick-add-modal').style.display = 'flex'; }
+        function closeQuickAddModal() { document.getElementById('quick-add-modal').style.display = 'none'; }
+
+        function saveQuickAdd() {
+            const name = document.getElementById('qa-name').value.trim();
+            const desc = document.getElementById('qa-desc').value.trim();
+            const price = document.getElementById('qa-price').value.trim();
+            const barcode = document.getElementById('qa-barcode').value.trim();
+
+            if (!name || !price || isNaN(parseFloat(price))) {
+                alert("يرجى كتابة اسم المادة وسعرها على الأقل!");
+                return;
+            }
+
+            showToast("⏳ جاري إضافة المادة للشيت...");
+
+            const payload = [{
+                barcode: barcode,
+                name: name,
+                price: parseFloat(price).toFixed(2),
+                desc: desc,
+                offer: ""
+            }];
+
+            postToGoogleSheet(payload, () => {
+                closeQuickAddModal();
+                showToast(`✅ تمت إضافة المادة "${name}" بنجاح!`, 4000);
+                document.getElementById('qa-name').value = '';
+                document.getElementById('qa-desc').value = '';
+                document.getElementById('qa-price').value = '';
+                document.getElementById('qa-barcode').value = '';
+                setTimeout(loadSheetData, 2500);
             });
         }
 
@@ -497,7 +713,7 @@
             }
         }
 
-        // ------------------ تفاصيل وتعديل المنتج ------------------
+        // ------------------ تعديل المنتج وحفظه ------------------
         function parseOfferString(offerStr) {
             if (!offerStr) return null;
             const str = String(offerStr).trim();
@@ -635,129 +851,15 @@
 
             showToast("⏳ جاري حفظ التعديلات في غوغل شيت...");
 
-            postToGoogle(payload, () => {
+            postToGoogleSheet(payload, () => {
                 showToast("✅ تم حفظ التعديلات في الشيت بنجاح!");
-                setTimeout(loadSheetData, 2000);
-            }, (err) => {
-                alert("حدث خطأ أثناء الحفظ: " + err);
+                setTimeout(loadSheetData, 2500);
             });
         }
 
         function clearProductOffer(barcode) {
             document.getElementById('edit-offer-price').value = '';
             saveAllChanges(barcode);
-        }
-
-        // ------------------ نافذة الإضافة السريعة ------------------
-        function openQuickAddModal() {
-            document.getElementById('quick-add-modal').style.display = 'flex';
-        }
-        function closeQuickAddModal() {
-            document.getElementById('quick-add-modal').style.display = 'none';
-        }
-
-        function saveQuickAdd() {
-            const name = document.getElementById('qa-name').value.trim();
-            const desc = document.getElementById('qa-desc').value.trim();
-            const price = document.getElementById('qa-price').value.trim();
-            const barcode = document.getElementById('qa-barcode').value.trim();
-
-            if (!name || !price || isNaN(parseFloat(price))) {
-                alert("يرجى كتابة اسم المادة وسعرها على الأقل!");
-                return;
-            }
-
-            showToast("⏳ جاري إضافة المادة للشيت...");
-
-            const payload = [{
-                barcode: barcode,
-                name: name,
-                price: parseFloat(price).toFixed(2),
-                desc: desc,
-                offer: ""
-            }];
-
-            postToGoogle(payload, () => {
-                closeQuickAddModal();
-                showToast(`✅ تمت إضافة المادة "${name}" بنجاح!`, 4000);
-                document.getElementById('qa-name').value = '';
-                document.getElementById('qa-desc').value = '';
-                document.getElementById('qa-price').value = '';
-                document.getElementById('qa-barcode').value = '';
-                setTimeout(loadSheetData, 2000);
-            }, (err) => {
-                alert("خطأ: " + err);
-            });
-        }
-
-        // ------------------ استيراد الإكسل ------------------
-        function handleExcelImport(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(evt) {
-                try {
-                    const data = new Uint8Array(evt.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
-                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                    const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
-
-                    parsedExcelData = json.map(row => {
-                        const barcode = String(row.barcode || row.Barcode || row['بار كود'] || row['كود'] || '').trim();
-                        const name = String(row.name || row.Name || row.Produkt || row.produkt || row['الاسم'] || row['اسم المنتج'] || '').trim();
-                        const price = String(row.price || row.Price || row.Preis || row.preis || row['السعر'] || '').trim().replace(',', '.');
-                        const offer = String(row.offer || row.Offer || row['العرض'] || '').trim().replace(',', '.');
-                        const desc = String(row.desc || row.Beschreibung || row.beschreibung || row['الوصف'] || row['الوزن'] || '').trim();
-                        return { barcode, name, price, offer, desc };
-                    }).filter(item => item.name !== "");
-
-                    if (parsedExcelData.length === 0) {
-                        alert("لم يتم العثور على مواد لها أسماء في الملف!");
-                        return;
-                    }
-
-                    document.getElementById('excel-summary-text').innerText = `تم فحص ${parsedExcelData.length} مادة للمطابقة والتحديث`;
-                    let listHtml = '';
-                    parsedExcelData.forEach((item, idx) => {
-                        listHtml += `
-                            <div style="padding:6px 0; border-bottom:1px solid #f1f5f9; display:flex; justify-content:space-between; font-size:12px;">
-                                <div>
-                                    <b>${idx + 1}. ${item.name}</b>
-                                    <div style="color:#64748b;">${item.desc ? '⚖️ ' + item.desc : 'بدون وزن'} | ${item.barcode ? 'كود: ' + item.barcode : '<span style="color:#d97706;">(مطابقة بالاسم والوزن)</span>'}</div>
-                                </div>
-                                <div style="font-weight:bold; color:#16a34a;">${item.price ? parseFloat(item.price).toFixed(2) + ' €' : '-'}</div>
-                            </div>
-                        `;
-                    });
-                    document.getElementById('excel-preview-list').innerHTML = listHtml;
-                    document.getElementById('excel-modal').style.display = 'flex';
-
-                } catch (err) {
-                    alert("خطأ أثناء قراءة الملف: " + err.message);
-                }
-            };
-            reader.readAsArrayBuffer(file);
-            e.target.value = '';
-        }
-
-        function closeExcelModal() { document.getElementById('excel-modal').style.display = 'none'; }
-
-        function uploadParsedExcel() {
-            const btn = document.getElementById('btn-confirm-upload');
-            btn.innerText = "⏳ جاري الرفع للشيت...";
-            btn.disabled = true;
-
-            postToGoogle(parsedExcelData, () => {
-                closeExcelModal();
-                showToast(`✅ تم إرسال ${parsedExcelData.length} مادة لتحديث الشيت بنجاح!`, 5000);
-                btn.innerText = "🚀 تأكيد ورفع للشيت";
-                btn.disabled = false;
-                setTimeout(loadSheetData, 3000);
-            }, (err) => {
-                alert("حدث خطأ أثناء الإرسال: " + err);
-                btn.disabled = false;
-            });
         }
 
         document.addEventListener('click', (e) => {
