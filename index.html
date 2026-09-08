@@ -3,142 +3,56 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>نظام الكاشير - جهاز السكنر</title>
+  <title>نظام الكاشير - حفظ تلقائي في جوجل درايف</title>
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    }
-    body {
-      background-color: #0f172a;
-      color: #f8fafc;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      padding: 16px;
-    }
-    header {
-      text-align: center;
-      margin-bottom: 12px;
-    }
-    h1 {
-      font-size: 1.4rem;
-      font-weight: 700;
-      margin-bottom: 4px;
-    }
-    #status {
-      font-size: 0.85rem;
-      color: #38bdf8;
-    }
-    .input-section {
-      margin-bottom: 12px;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: #0f172a; color: #f8fafc; min-height: 100vh; display: flex; flex-direction: column; padding: 16px; }
+    header { text-align: center; margin-bottom: 12px; }
+    h1 { font-size: 1.4rem; font-weight: 700; margin-bottom: 4px; }
+    #status { font-size: 0.85rem; color: #38bdf8; }
+    .input-section { margin-bottom: 12px; }
     #barcode-input {
-      width: 100%;
-      padding: 14px;
-      font-size: 1.15rem;
-      font-weight: bold;
-      border-radius: 12px;
-      border: 2px solid #3b82f6;
-      background-color: #1e293b;
-      color: #38bdf8;
-      text-align: center;
-      outline: none;
+      width: 100%; padding: 14px; font-size: 1.15rem; font-weight: bold; border-radius: 12px;
+      border: 2px solid #3b82f6; background-color: #1e293b; color: #38bdf8; text-align: center; outline: none;
     }
-    #barcode-input:focus {
-      border-color: #60a5fa;
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
-    }
+    #barcode-input:focus { border-color: #60a5fa; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25); }
     #feedback {
-      min-height: 48px;
-      padding: 10px 14px;
-      border-radius: 10px;
-      margin-bottom: 12px;
-      font-weight: 600;
-      font-size: 0.95rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      background-color: #1e293b;
-      border: 1px dashed #334155;
+      min-height: 48px; padding: 10px 14px; border-radius: 10px; margin-bottom: 12px;
+      font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; justify-content: center;
+      text-align: center; background-color: #1e293b; border: 1px dashed #334155;
     }
-    .success {
-      background-color: #14532d !important;
-      color: #86efac !important;
-      border: 1px solid #22c55e !important;
-    }
-    .error {
-      background-color: #7f1d1d !important;
-      color: #fca5a5 !important;
-      border: 1px solid #ef4444 !important;
-    }
+    .success { background-color: #14532d !important; color: #86efac !important; border: 1px solid #22c55e !important; }
+    .error { background-color: #7f1d1d !important; color: #fca5a5 !important; border: 1px solid #ef4444 !important; }
     .total-card {
-      background-color: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 14px;
-      padding: 14px 18px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 14px;
+      background-color: #1e293b; border: 1px solid #334155; border-radius: 14px;
+      padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
     }
-    .total-title {
-      font-size: 0.9rem;
-      color: #94a3b8;
+    .total-title { font-size: 0.9rem; color: #94a3b8; }
+    .total-price { font-size: 1.8rem; font-weight: 800; color: #22c55e; }
+    .actions-bar { display: flex; gap: 10px; margin-bottom: 14px; }
+    .btn-pay {
+      flex: 2; background-color: #16a34a; color: #fff; border: none; padding: 14px;
+      border-radius: 12px; font-size: 1.1rem; font-weight: bold; cursor: pointer;
     }
-    .total-price {
-      font-size: 1.7rem;
-      font-weight: 800;
-      color: #22c55e;
-    }
+    .btn-pay:active { background-color: #15803d; }
     .btn-clear {
-      background-color: #dc2626;
-      color: #fff;
-      border: none;
-      padding: 8px 14px;
-      border-radius: 8px;
-      font-weight: 600;
-      cursor: pointer;
+      flex: 1; background-color: #334155; color: #cbd5e1; border: none; padding: 14px;
+      border-radius: 12px; font-size: 0.95rem; font-weight: 600; cursor: pointer;
     }
     .cart-container {
-      flex: 1;
-      background-color: #ffffff;
-      border-radius: 14px;
-      padding: 12px;
-      color: #0f172a;
-      overflow-y: auto;
-      max-height: 48vh;
+      flex: 1; background-color: #ffffff; border-radius: 14px; padding: 12px;
+      color: #0f172a; overflow-y: auto; max-height: 44vh;
     }
-    .cart-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 10px 6px;
-      border-bottom: 1px solid #e2e8f0;
-    }
-    .item-name {
-      font-weight: 600;
-      font-size: 0.95rem;
-    }
-    .item-price {
-      font-weight: 700;
-      color: #16a34a;
-    }
-    .empty-cart {
-      text-align: center;
-      color: #94a3b8;
-      padding-top: 40px;
-      font-size: 0.9rem;
-    }
+    .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 6px; border-bottom: 1px solid #e2e8f0; }
+    .item-name { font-weight: 600; font-size: 0.95rem; }
+    .item-price { font-weight: 700; color: #16a34a; }
+    .empty-cart { text-align: center; color: #94a3b8; padding-top: 40px; font-size: 0.9rem; }
   </style>
 </head>
 <body>
 
   <header>
-    <h1>🧾 كاشير المحل (وضع السكنر)</h1>
+    <h1>🧾 كاشير المحل (حفظ سحابي)</h1>
     <div id="status">⏳ جاري تحميل المنتجات...</div>
   </header>
 
@@ -162,7 +76,11 @@
       <div class="total-title">المجموع الكلي</div>
       <div class="total-price" id="total-val">0.00 €</div>
     </div>
-    <button class="btn-clear" onclick="clearCart()">سلة جديدة</button>
+  </div>
+
+  <div class="actions-bar">
+    <button class="btn-pay" onclick="handlePayment()">💵 تم الدفع وحفظ PDF بالدرايف</button>
+    <button class="btn-clear" onclick="clearCart()">إلغاء السلة</button>
   </div>
 
   <div class="cart-container" id="cart-list">
@@ -171,16 +89,18 @@
 
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQCpR9i8vwj3iwcjDyB3xQjx2iTaD3s1kLjYRbwNQW-IOcrdADwRE4mBGbk96pxKGKLYqfbpjVuDLqI/pub?output=csv";
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz6VkxJteGJAeQaR5oTqdYValeCbxP62sr71HzkbcYy9kviVPb3cdK4-fdCgb0uibIHIA/exec";
 
     let products = [];
     let cart = [];
+    let invoiceCounter = parseInt(localStorage.getItem('last_invoice_no') || '1000');
+
     const inputField = document.getElementById('barcode-input');
     const statusDiv = document.getElementById('status');
     const feedbackDiv = document.getElementById('feedback');
     const cartList = document.getElementById('cart-list');
     const totalVal = document.getElementById('total-val');
 
-    // تحويل الأرقام الهندية/العربية (١٢٣) إلى إنجليزية (123) تلقائياً
     function normalizeBarcode(str) {
       const arabicNumbers = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
       return String(str || '').replace(/[٠-٩]/g, d => arabicNumbers.indexOf(d)).trim();
@@ -216,15 +136,11 @@
       });
 
     function keepFocus() {
-      setTimeout(() => {
-        inputField.focus();
-      }, 50);
+      setTimeout(() => { inputField.focus(); }, 50);
     }
 
     document.addEventListener('click', (e) => {
-      if (e.target.tagName !== 'BUTTON') {
-        keepFocus();
-      }
+      if (e.target.tagName !== 'BUTTON') keepFocus();
     });
 
     inputField.addEventListener('keydown', (e) => {
@@ -281,11 +197,54 @@
       totalVal.textContent = `${sum.toFixed(2)} €`;
     }
 
-    function clearCart() {
+    function handlePayment() {
+      if (cart.length === 0) {
+        showFeedback("⚠️ السلة فارغة!", "error");
+        keepFocus();
+        return;
+      }
+
+      invoiceCounter++;
+      localStorage.setItem('last_invoice_no', invoiceCounter);
+
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('ar-EG') + ' ' + now.toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'});
+      const totalAmount = totalVal.textContent;
+
+      const summary = {};
+      cart.forEach(item => {
+        if (!summary[item.name]) {
+          summary[item.name] = { name: item.name, count: 0, price: item.price, total: 0 };
+        }
+        summary[item.name].count += 1;
+        summary[item.name].total += item.price;
+      });
+
+      const invoicePayload = {
+        invoiceNo: invoiceCounter,
+        date: dateStr,
+        total: totalAmount,
+        items: Object.values(summary)
+      };
+
+      fetch(GOOGLE_SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(invoicePayload)
+      });
+
       cart = [];
       renderCart();
-      feedbackDiv.textContent = "تم تجهيز سلة جديدة";
-      feedbackDiv.className = "";
+      showFeedback(`🎉 تم الدفع وحفظ فاتورة #${invoiceCounter} بالدرايف!`, "success");
+      keepFocus();
+    }
+
+    function clearCart() {
+      if (cart.length === 0) return;
+      cart = [];
+      renderCart();
+      showFeedback("تم إلغاء السلة الحالية", "");
       keepFocus();
     }
   </script>
