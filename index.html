@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>نظام الكاشير - حساب الباقي وحفظ الفاتورة</title>
+  <title>نظام الكاشير - خصم المخزون وحفظ الفاتورة</title>
   <style>
     * { 
       box-sizing: border-box; 
@@ -38,7 +38,6 @@
     .success { background-color: #14532d !important; color: #86efac !important; border: 1px solid #22c55e !important; }
     .error { background-color: #7f1d1d !important; color: #fca5a5 !important; border: 1px solid #ef4444 !important; }
 
-    /* بطاقة الإجمالي والحساب */
     .total-card {
       background-color: #1e293b; border: 1px solid #334155; border-radius: 12px;
       padding: 12px 16px; margin-bottom: 10px;
@@ -50,7 +49,6 @@
     .total-price { font-size: 1.6rem; font-weight: 800; color: #22c55e; }
     .change-text { font-size: 1.3rem; font-weight: 800; color: #facc15; }
 
-    /* قسم فئات اليورو */
     .cash-calc-box {
       background-color: #1e293b; border: 1px solid #334155; border-radius: 12px;
       padding: 10px; margin-bottom: 10px;
@@ -69,18 +67,15 @@
       cursor: pointer; text-align: center;
     }
     .btn-euro:active { background-color: #3b82f6; border-color: #60a5fa; }
-    .btn-note { background-color: #1e3a8a; border-color: #2563eb; color: #93c5fd; } /* للعملات الورقية */
+    .btn-note { background-color: #1e3a8a; border-color: #2563eb; color: #93c5fd; }
 
-    .cash-controls {
-      display: flex; gap: 6px; margin-top: 6px;
-    }
+    .cash-controls { display: flex; gap: 6px; margin-top: 6px; }
     .btn-quick {
       flex: 1; padding: 6px; font-size: 0.8rem; border-radius: 6px; border: none;
       font-weight: bold; cursor: pointer; background-color: #475569; color: #fff;
     }
     .btn-quick:active { background-color: #64748b; }
 
-    /* أزرار الدفع والإلغاء */
     .actions-bar { display: flex; gap: 8px; margin-bottom: 10px; }
     .btn-pay {
       flex: 2; background-color: #16a34a; color: #fff; border: none; padding: 12px;
@@ -92,7 +87,6 @@
       border-radius: 10px; font-size: 0.9rem; font-weight: 600; cursor: pointer;
     }
 
-    /* سلة المشتريات */
     .cart-container {
       flex: 1; background-color: #ffffff; border-radius: 12px; padding: 10px;
       color: #0f172a; overflow-y: auto; max-height: 28vh;
@@ -125,7 +119,6 @@
 
   <div id="feedback">جاهز للمسح بالسكنر...</div>
 
-  <!-- بطاقة الحساب والمبالغ -->
   <div class="total-card">
     <div class="row-info">
       <span class="total-title">المجموع المطلوب:</span>
@@ -141,11 +134,8 @@
     </div>
   </div>
 
-  <!-- لوحة فئات اليورو السريعة -->
   <div class="cash-calc-box">
-    <div class="cash-title">💶 فئات اليورو (المبلغ المستلم نقداً):</div>
-    
-    <!-- العملات الورقية -->
+    <div class="cash-title">💶 فئات اليورو (المبلغ المستلم):</div>
     <div class="denominations-grid">
       <button class="btn-euro btn-note" onclick="addCash(100)">100€</button>
       <button class="btn-euro btn-note" onclick="addCash(50)">50€</button>
@@ -153,8 +143,6 @@
       <button class="btn-euro btn-note" onclick="addCash(10)">10€</button>
       <button class="btn-euro btn-note" onclick="addCash(5)">5€</button>
     </div>
-
-    <!-- العملات المعدنية -->
     <div class="denominations-grid">
       <button class="btn-euro" onclick="addCash(2)">2€</button>
       <button class="btn-euro" onclick="addCash(1)">1€</button>
@@ -162,20 +150,17 @@
       <button class="btn-euro" onclick="addCash(0.20)">0.20€</button>
       <button class="btn-euro" onclick="addCash(0.10)">0.10€</button>
     </div>
-
     <div class="cash-controls">
       <button class="btn-quick" onclick="setExactCash()">المبلغ بالضبط</button>
       <button class="btn-quick" style="background-color: #7f1d1d;" onclick="resetCash()">تصفير المستلم</button>
     </div>
   </div>
 
-  <!-- إجراءات الإنهاء -->
   <div class="actions-bar">
-    <button class="btn-pay" onclick="handlePayment()">💵 إتمام الدفع وحفظ PDF</button>
+    <button class="btn-pay" onclick="handlePayment()">💵 إتمام الدفع وخصم المخزون</button>
     <button class="btn-clear" onclick="clearCart()">إلغاء السلة</button>
   </div>
 
-  <!-- السلة -->
   <div class="cart-container" id="cart-list">
     <div class="empty-cart">السلة فارغة - ابدأ بالمسح</div>
   </div>
@@ -273,7 +258,6 @@
       return cart.reduce((sum, item) => sum + item.price, 0);
     }
 
-    // دوال حاسبة الفئات واليورو
     function addCash(amount) {
       receivedCash = parseFloat((receivedCash + amount).toFixed(2));
       updateCashUI();
@@ -302,10 +286,10 @@
         changeVal.style.color = "#facc15";
       } else if (change >= 0) {
         changeVal.textContent = `${change.toFixed(2)} €`;
-        changeVal.style.color = "#22c55e"; // أخضر: باقي سليم للزبون
+        changeVal.style.color = "#22c55e";
       } else {
         changeVal.textContent = `ناقص: ${Math.abs(change).toFixed(2)} €`;
-        changeVal.style.color = "#ef4444"; // أحمر: المبلغ غير كافٍ
+        changeVal.style.color = "#ef4444";
       }
     }
 
@@ -335,7 +319,6 @@
       updateCashUI();
     }
 
-    // إتمام العملية وحفظ الفاتورة بالدرايف مع تفاصيل الدفع
     function handlePayment() {
       if (cart.length === 0) {
         showFeedback("⚠️ السلة فارغة!", "error");
@@ -344,8 +327,6 @@
       }
 
       const totalSum = getTotalSum();
-      
-      // إذا لم يحدد الكاشير أي فئة، يعتبر المبلغ مدفوعاً بالضبط
       const finalPaid = receivedCash > 0 ? receivedCash : totalSum;
       const finalChange = finalPaid >= totalSum ? (finalPaid - totalSum) : 0;
 
@@ -355,10 +336,17 @@
       const now = new Date();
       const dateStr = now.toLocaleDateString('ar-EG') + ' ' + now.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
 
+      // تجميع المنتجات مع الاحتفاظ بالباركود للخصم من الشيت
       const summary = {};
       cart.forEach(item => {
         if (!summary[item.name]) {
-          summary[item.name] = { name: item.name, count: 0, price: item.price, total: 0 };
+          summary[item.name] = { 
+            barcode: item.barcode, 
+            name: item.name, 
+            count: 0, 
+            price: item.price, 
+            total: 0 
+          };
         }
         summary[item.name].count += 1;
         summary[item.name].total += item.price;
@@ -373,7 +361,7 @@
         items: Object.values(summary)
       };
 
-      // إرسال الفاتورة لجوجل درايف
+      // إرسال البيانات للسكربت لتحديث المخزون وحفظ الـ PDF
       fetch(GOOGLE_SCRIPT_URL, {
         method: 'POST',
         mode: 'no-cors',
@@ -381,8 +369,7 @@
         body: JSON.stringify(invoicePayload)
       });
 
-      // إظهار رسالة الباقي وتصفير السلة فوراً
-      showFeedback(`🎉 تم دفع #${invoiceCounter} | الباقي: ${finalChange.toFixed(2)} €`, "success");
+      showFeedback(`🎉 تم دفع #${invoiceCounter} وحُدّث المخزون | الباقي: ${finalChange.toFixed(2)} €`, "success");
       cart = [];
       receivedCash = 0;
       renderCart();
