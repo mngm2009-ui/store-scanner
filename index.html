@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>نظام الكاشير - خصم المخزون وحفظ الفاتورة</title>
+  <title>نظام الكاشير - نقطة البيع</title>
   <style>
     * { 
       box-sizing: border-box; 
@@ -17,11 +17,28 @@
       min-height: 100vh; 
       display: flex; 
       flex-direction: column; 
-      padding: 14px; 
+      padding: 12px; 
     }
-    header { text-align: center; margin-bottom: 8px; }
-    h1 { font-size: 1.3rem; font-weight: 700; }
+    header { 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      margin-bottom: 8px; 
+    }
+    h1 { font-size: 1.25rem; font-weight: 700; }
     #status { font-size: 0.8rem; color: #38bdf8; }
+    
+    .btn-sync {
+      background-color: #0284c7;
+      color: #fff;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-weight: bold;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    .btn-sync:active { background-color: #0369a1; }
 
     .input-section { margin-bottom: 8px; }
     #barcode-input {
@@ -31,7 +48,7 @@
     #barcode-input:focus { border-color: #60a5fa; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25); }
 
     #feedback {
-      min-height: 40px; padding: 8px 12px; border-radius: 8px; margin-bottom: 8px;
+      min-height: 38px; padding: 8px 12px; border-radius: 8px; margin-bottom: 8px;
       font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; justify-content: center;
       text-align: center; background-color: #1e293b; border: 1px dashed #334155;
     }
@@ -40,20 +57,20 @@
 
     .total-card {
       background-color: #1e293b; border: 1px solid #334155; border-radius: 12px;
-      padding: 12px 16px; margin-bottom: 10px;
+      padding: 10px 14px; margin-bottom: 8px;
     }
     .row-info {
       display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;
     }
-    .total-title { font-size: 0.9rem; color: #94a3b8; }
+    .total-title { font-size: 0.85rem; color: #94a3b8; }
     .total-price { font-size: 1.6rem; font-weight: 800; color: #22c55e; }
     .change-text { font-size: 1.3rem; font-weight: 800; color: #facc15; }
 
     .cash-calc-box {
       background-color: #1e293b; border: 1px solid #334155; border-radius: 12px;
-      padding: 10px; margin-bottom: 10px;
+      padding: 8px 10px; margin-bottom: 8px;
     }
-    .cash-title { font-size: 0.85rem; color: #94a3b8; margin-bottom: 6px; font-weight: 600; }
+    .cash-title { font-size: 0.8rem; color: #94a3b8; margin-bottom: 6px; font-weight: 600; }
     
     .denominations-grid {
       display: grid;
@@ -63,23 +80,23 @@
     }
     .btn-euro {
       background-color: #334155; color: #f8fafc; border: 1px solid #475569;
-      padding: 8px 4px; border-radius: 8px; font-size: 0.95rem; font-weight: bold;
+      padding: 7px 2px; border-radius: 8px; font-size: 0.9rem; font-weight: bold;
       cursor: pointer; text-align: center;
     }
     .btn-euro:active { background-color: #3b82f6; border-color: #60a5fa; }
     .btn-note { background-color: #1e3a8a; border-color: #2563eb; color: #93c5fd; }
 
-    .cash-controls { display: flex; gap: 6px; margin-top: 6px; }
+    .cash-controls { display: flex; gap: 6px; margin-top: 4px; }
     .btn-quick {
       flex: 1; padding: 6px; font-size: 0.8rem; border-radius: 6px; border: none;
       font-weight: bold; cursor: pointer; background-color: #475569; color: #fff;
     }
     .btn-quick:active { background-color: #64748b; }
 
-    .actions-bar { display: flex; gap: 8px; margin-bottom: 10px; }
+    .actions-bar { display: flex; gap: 8px; margin-bottom: 8px; }
     .btn-pay {
       flex: 2; background-color: #16a34a; color: #fff; border: none; padding: 12px;
-      border-radius: 10px; font-size: 1.05rem; font-weight: bold; cursor: pointer;
+      border-radius: 10px; font-size: 1rem; font-weight: bold; cursor: pointer;
     }
     .btn-pay:active { background-color: #15803d; }
     .btn-clear {
@@ -91,8 +108,8 @@
       flex: 1; background-color: #ffffff; border-radius: 12px; padding: 10px;
       color: #0f172a; overflow-y: auto; max-height: 28vh;
     }
-    .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 4px; border-bottom: 1px solid #e2e8f0; }
-    .item-name { font-weight: 600; font-size: 0.9rem; }
+    .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 7px 4px; border-bottom: 1px solid #e2e8f0; }
+    .item-name { font-weight: 600; font-size: 0.88rem; }
     .item-price { font-weight: 700; color: #16a34a; font-size: 0.9rem; }
     .empty-cart { text-align: center; color: #94a3b8; padding-top: 25px; font-size: 0.85rem; }
   </style>
@@ -100,8 +117,11 @@
 <body>
 
   <header>
-    <h1>🧾 كاشير المحل</h1>
-    <div id="status">⏳ جاري تحميل المنتجات...</div>
+    <div>
+      <h1>🧾 كاشير المحل</h1>
+      <div id="status">⏳ جاري تحميل المنتجات...</div>
+    </div>
+    <button class="btn-sync" onclick="loadProducts()">تحديث 🔄</button>
   </header>
 
   <div class="input-section">
@@ -187,34 +207,58 @@
       return String(str || '').replace(/[٠-٩]/g, d => arabicNumbers.indexOf(d)).trim();
     }
 
-    fetch(SHEET_CSV_URL)
-      .then(res => res.text())
-      .then(csvText => {
-        const rows = csvText.split('\n').map(r => r.split(','));
-        const headers = rows[0].map(h => h.trim().toLowerCase());
-        const loaded = [];
+    function loadProducts() {
+      statusDiv.textContent = "⏳ جاري تحديث البيانات...";
+      // إضافة طابع زمني لمنع حفظ الكاش
+      fetch(SHEET_CSV_URL + "&_cb=" + new Date().getTime())
+        .then(res => res.text())
+        .then(csvText => {
+          const rows = csvText.split('\n').map(r => r.split(','));
+          const headers = rows[0].map(h => h.trim().toLowerCase());
+          const loaded = [];
 
-        for (let i = 1; i < rows.length; i++) {
-          const row = rows[i];
-          if (row.length < 2) continue;
-          let item = {};
-          headers.forEach((h, idx) => { item[h] = row[idx] ? row[idx].trim() : ''; });
-          
-          const rawBarcode = item['barcode'] || item['بار كود'] || row[0] || '';
-          const name = item['produkt'] || item['name'] || item['الاسم'] || row[1] || '';
-          const price = parseFloat(item['preis'] || item['price'] || item['السعر'] || row[2] || 0);
+          for (let i = 1; i < rows.length; i++) {
+            const row = rows[i];
+            if (row.length < 2) continue;
+            let item = {};
+            headers.forEach((h, idx) => { item[h] = row[idx] ? row[idx].trim() : ''; });
+            
+            const rawBarcode = item['barcode'] || item['بار كود'] || row[0] || '';
+            const name = item['name'] || item['produkt'] || item['الاسم'] || row[1] || '';
+            
+            // قراءة السعر الأساسي وتنظيفه
+            let rawPrice = item['price'] || item['preis'] || item['السعر'] || row[2] || '0';
+            rawPrice = String(rawPrice).replace(/[^0-9.,]/g, '').replace(',', '.');
+            const basePrice = parseFloat(rawPrice) || 0;
 
-          if (rawBarcode) {
-            loaded.push({ barcode: normalizeBarcode(rawBarcode), name, price });
+            // قراءة سعر العرض إن وجد وتنظيفه
+            let rawOffer = item['offer'] || item['angebot'] || item['عرض'] || row[3] || '';
+            rawOffer = String(rawOffer).replace(/[^0-9.,]/g, '').replace(',', '.');
+            const offerPrice = parseFloat(rawOffer) || 0;
+
+            // اعتماد سعر العرض إذا كان أكبر من الصفر
+            const hasOffer = offerPrice > 0;
+            const finalPrice = hasOffer ? offerPrice : basePrice;
+
+            if (rawBarcode) {
+              loaded.push({ 
+                barcode: normalizeBarcode(rawBarcode), 
+                name: hasOffer ? `${name} (عرض 🔥)` : name, 
+                price: finalPrice 
+              });
+            }
           }
-        }
-        products = loaded;
-        statusDiv.textContent = `✅ جاهز للمسح (${loaded.length} منتج)`;
-        keepFocus();
-      })
-      .catch(() => {
-        statusDiv.textContent = "❌ خطأ في تحميل جدول المنتجات";
-      });
+          products = loaded;
+          statusDiv.textContent = `✅ جاهز (${loaded.length} منتج)`;
+          keepFocus();
+        })
+        .catch(() => {
+          statusDiv.textContent = "❌ خطأ في تحميل جدول المنتجات";
+        });
+    }
+
+    // التحميل المبدئي عند فتح الصفحة
+    loadProducts();
 
     function keepFocus() {
       setTimeout(() => { inputField.focus(); }, 50);
@@ -336,7 +380,7 @@
       const now = new Date();
       const dateStr = now.toLocaleDateString('ar-EG') + ' ' + now.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
 
-      // تجميع المنتجات مع الاحتفاظ بالباركود للخصم من الشيت
+      // تجميع الأصناف مع حفظ الباركود لخصم المخزون بدقة
       const summary = {};
       cart.forEach(item => {
         if (!summary[item.name]) {
@@ -361,7 +405,7 @@
         items: Object.values(summary)
       };
 
-      // إرسال البيانات للسكربت لتحديث المخزون وحفظ الـ PDF
+      // إرسال البيانات لتوليد الـ PDF وخصم المخزون
       fetch(GOOGLE_SCRIPT_URL, {
         method: 'POST',
         mode: 'no-cors',
