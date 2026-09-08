@@ -207,47 +207,79 @@
       return String(str || '').replace(/[٠-٩]/g, d => arabicNumbers.indexOf(d)).trim();
     }
 
+    // محلل CSV احترافي يتجاهل الفواصل داخل النصوص وعلامات التنصيص
+    function parseCSVLine(text) {
+      let p = '', c = false, r = [];
+      for (let i = 0; i < text.length; i++) {
+        let ch = text[i];
+        if (ch === '"') {
+          if (c && text[i + 1] === '"') { p += '"'; i++; }
+          else { c = !c; }
+        } else if (ch === ',' && !c) {
+          r.push(p);
+          p = '';
+        } else {
+          p += ch;
+        }
+      }
+      r.push(p);
+      return r;
+    }
+
+    // تنظيف الأرقام من العملات وتحويل الفاصلة الألمانية لنقطة
+    function cleanNumber(val) {
+      if (!val) return 0;
+      let s = String(val).trim().replace(/[^0-9.,]/g, '');
+      if (s.includes(',') && s.includes('.')) {
+        s = s.replace(/\./g, '').replace(',', '.');
+      } else if (s.includes(',')) {
+        s = s.replace(',', '.');
+      }
+      return parseFloat(s) || 0;
+    }
+
     function loadProducts() {
       statusDiv.textContent = "⏳ جاري تحديث البيانات...";
-      // إضافة طابع زمني لمنع حفظ الكاش
       fetch(SHEET_CSV_URL + "&_cb=" + new Date().getTime())
         .then(res => res.text())
         .then(csvText => {
-          const rows = csvText.split('\n').map(r => r.split(','));
-          const headers = rows[0].map(h => h.trim().toLowerCase());
+          const lines = csvText.split(/\r?\n/).filter(line => line.trim().length > 0);
+          if (lines.length < 2) return;
+
+          const rawHeaders = parseCSVLine(lines[0]);
+          const headers = rawHeaders.map(h => h.trim().toLowerCase());
+
+          // تحديد أماكن الأعمدة بالاسم تلقائياً
+          const barcodeIdx = headers.findIndex(h => h.includes('barcode') || h.includes('بار كود'));
+          const nameIdx = headers.findIndex(h => h.includes('name') || h.includes('produkt') || h.includes('الاسم'));
+          const priceIdx = headers.findIndex(h => h.includes('price') || h.includes('preis') || h.includes('السعر'));
+          const offerIdx = headers.findIndex(h => h.includes('offer') || h.includes('angebot') || h.includes('عرض'));
+
           const loaded = [];
 
-          for (let i = 1; i < rows.length; i++) {
-            const row = rows[i];
-            if (row.length < 2) continue;
-            let item = {};
-            headers.forEach((h, idx) => { item[h] = row[idx] ? row[idx].trim() : ''; });
-            
-            const rawBarcode = item['barcode'] || item['بار كود'] || row[0] || '';
-            const name = item['name'] || item['produkt'] || item['الاسم'] || row[1] || '';
-            
-            // قراءة السعر الأساسي وتنظيفه
-            let rawPrice = item['price'] || item['preis'] || item['السعر'] || row[2] || '0';
-            rawPrice = String(rawPrice).replace(/[^0-9.,]/g, '').replace(',', '.');
-            const basePrice = parseFloat(rawPrice) || 0;
+          for (let i = 1; i < lines.length; i++) {
+            const cols = parseCSVLine(lines[i]);
+            if (cols.length < 2) continue;
 
-            // قراءة سعر العرض إن وجد وتنظيفه
-            let rawOffer = item['offer'] || item['angebot'] || item['عرض'] || row[3] || '';
-            rawOffer = String(rawOffer).replace(/[^0-9.,]/g, '').replace(',', '.');
-            const offerPrice = parseFloat(rawOffer) || 0;
+            const rawBarcode = barcodeIdx !== -1 ? cols[barcodeIdx] : cols[0];
+            const name = nameIdx !== -1 ? cols[nameIdx] : cols[1];
+            
+            const basePrice = priceIdx !== -1 ? cleanNumber(cols[priceIdx]) : 0;
+            const offerPrice = offerIdx !== -1 ? cleanNumber(cols[offerIdx]) : 0;
 
-            // اعتماد سعر العرض إذا كان أكبر من الصفر
+            // اعتماد سعر العرض إذا كان مدخلاً وأكبر من الصفر
             const hasOffer = offerPrice > 0;
             const finalPrice = hasOffer ? offerPrice : basePrice;
 
-            if (rawBarcode) {
+            if (rawBarcode && String(rawBarcode).trim() !== '') {
               loaded.push({ 
                 barcode: normalizeBarcode(rawBarcode), 
-                name: hasOffer ? `${name} (عرض 🔥)` : name, 
+                name: hasOffer ? `${name.trim()} (عرض 🔥)` : name.trim(), 
                 price: finalPrice 
               });
             }
           }
+
           products = loaded;
           statusDiv.textContent = `✅ جاهز (${loaded.length} منتج)`;
           keepFocus();
@@ -257,7 +289,6 @@
         });
     }
 
-    // التحميل المبدئي عند فتح الصفحة
     loadProducts();
 
     function keepFocus() {
@@ -380,7 +411,7 @@
       const now = new Date();
       const dateStr = now.toLocaleDateString('ar-EG') + ' ' + now.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
 
-      // تجميع الأصناف مع حفظ الباركود لخصم المخزون بدقة
+      // تجميع الأصناف وتمرير الباركود بدقة لخصم المخزون
       const summary = {};
       cart.forEach(item => {
         if (!summary[item.name]) {
@@ -405,7 +436,7 @@
         items: Object.values(summary)
       };
 
-      // إرسال البيانات لتوليد الـ PDF وخصم المخزون
+      // إرسال البيانات لحفظ PDF وخصم الكميات من Google Sheets
       fetch(GOOGLE_SCRIPT_URL, {
         method: 'POST',
         mode: 'no-cors',
