@@ -20,7 +20,6 @@
 
         label { display: block; margin-top: 12px; font-weight: bold; color: #475569; font-size: 13px; }
         
-        /* فرض الأرقام اللاتينية الإنجليزية والاتجاه الصحيح */
         input, select { 
             width: 100%; padding: 10px; margin-top: 4px; box-sizing: border-box; 
             border: 1px solid #cbd5e1; border-radius: 6px; font-size: 15px; outline: none; 
@@ -162,7 +161,8 @@
 </div>
 
 <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz6VkxJteGJAeQaR5oTqdYValeCbxP62sr71HzkbcYy9kviVPb3cdK4-fdCgb0uibIHIA/exec";
+    // تم تحديث الرابط هنا
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxvDw2x20HfiqB9a3Hqyb8lpA7jOstRmWdFyMDN6iRZrV8wIYO5Q-hAyy8UfUICL6E/exec";
 
     function toLatin(str) {
         if (!str) return "";
@@ -191,7 +191,6 @@
         }
     }
 
-    // البحث يعمل الآن عبر POST لتخطي قيود CORS وإعادة التوجيه تماماً
     async function searchProduct() {
         const query = toLatin(document.getElementById('barcode').value.trim());
         const msg = document.getElementById('message');
@@ -254,7 +253,7 @@
         } catch (e) {
             console.error(e);
             msg.style.color = '#ef4444';
-            msg.innerText = '❌ تعذر إتمام البحث. تحقق من إعدادات النشر كـ (New version).';
+            msg.innerText = '❌ تعذر إتمام البحث. تحقق من الإنترنت ورابط السكربت.';
         } finally {
             searchBtn.disabled = false;
         }
