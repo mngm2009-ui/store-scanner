@@ -20,7 +20,7 @@
 
         label { display: block; margin-top: 12px; font-weight: bold; color: #475569; font-size: 13px; }
         
-        /* فرض الأرقام اللاتينية والشكل المناسب */
+        /* فرض الأرقام اللاتينية الإنجليزية والاتجاه الصحيح */
         input, select { 
             width: 100%; padding: 10px; margin-top: 4px; box-sizing: border-box; 
             border: 1px solid #cbd5e1; border-radius: 6px; font-size: 15px; outline: none; 
@@ -40,12 +40,10 @@
         .scan-btn { background: #334155; margin-top: 8px; color: white; border: none; padding: 11px; border-radius: 8px; width: 100%; cursor: pointer; font-size: 14px; font-weight: bold; }
         .no-barcode-btn { background: #f1f5f9; margin-top: 8px; color: #475569; border: 1px solid #e2e8f0; padding: 8px; border-radius: 6px; width: 100%; cursor: pointer; font-weight: bold; font-size: 12px; }
 
-        /* حالة المنتج */
         .status-badge { display: none; margin-top: 10px; padding: 8px; border-radius: 6px; font-size: 13px; font-weight: bold; text-align: center; }
         .status-badge.found { display: block; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
         .status-badge.new { display: block; background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
 
-        /* منطقة الأزرار الديناميكية */
         .action-buttons { display: flex; gap: 8px; margin-top: 18px; }
         .btn-action { flex: 1; border: none; padding: 12px; border-radius: 8px; font-size: 14px; cursor: pointer; font-weight: bold; }
         .btn-update { background: #0284c7; color: white; }
@@ -57,7 +55,6 @@
         #previewCanvas { max-width: 100%; border: 2px dashed #38bdf8; cursor: crosshair; display: block; margin: 0 auto; touch-action: none; }
         .confirm-crop-btn { background: #16a34a; color: white; border: none; padding: 9px; width: 100%; margin-top: 8px; border-radius: 6px; font-weight: bold; cursor: pointer; }
 
-        /* رفع إكسل */
         .drop-zone { border: 2px dashed #0284c7; background: #f0f9ff; border-radius: 10px; padding: 25px 15px; text-align: center; cursor: pointer; }
         .drop-zone p { margin: 0; font-weight: bold; color: #0369a1; font-size: 14px; }
         .preview-box { margin-top: 15px; display: none; }
@@ -84,7 +81,7 @@
         <label for="barcode">كود المنتج أو الاسم للبحث:</label>
         <div class="search-box">
             <input type="text" id="barcode" class="latin-num" placeholder="امسح أو اكتب الكود..." oninput="forceLatinDigits(this)" onkeydown="if(event.key==='Enter') searchProduct();">
-            <button type="button" class="btn-search" onclick="searchProduct()">🔍 بحث</button>
+            <button type="button" id="searchBtn" class="btn-search" onclick="searchProduct()">🔍 بحث</button>
         </div>
 
         <button type="button" class="scan-btn" onclick="document.getElementById('nativeCamera').click();">📸 مسح عبر الكاميرا</button>
@@ -134,7 +131,6 @@
         <label for="quantity">الكمية في المخزون:</label>
         <input type="text" id="quantity" class="latin-num" placeholder="مثال: 20" oninput="forceLatinDigits(this)">
 
-        <!-- أزرار الإجراءات تتغير تلقائياً حسب نتيجة البحث -->
         <div id="actionContainer" class="action-buttons">
             <button class="btn-action btn-add" id="btnSubmit" onclick="submitProduct('insert')">💾 حفظ كمنتج جديد</button>
         </div>
@@ -168,7 +164,6 @@
 <script>
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz6VkxJteGJAeQaR5oTqdYValeCbxP62sr71HzkbcYy9kviVPb3cdK4-fdCgb0uibIHIA/exec";
 
-    // دالة تحويل أي أرقام هندية إلى أرقام لاتينية إنجليزية فوراً
     function toLatin(str) {
         if (!str) return "";
         return String(str)
@@ -196,24 +191,31 @@
         }
     }
 
-    // --- نظام البحث عن المنتج وجلب تفاصيله ---
+    // البحث يعمل الآن عبر POST لتخطي قيود CORS وإعادة التوجيه تماماً
     async function searchProduct() {
         const query = toLatin(document.getElementById('barcode').value.trim());
         const msg = document.getElementById('message');
         const badge = document.getElementById('statusBadge');
         const actionBox = document.getElementById('actionContainer');
+        const searchBtn = document.getElementById('searchBtn');
 
         if (!query) {
             msg.style.color = '#ef4444';
-            msg.innerText = '⚠️ يرجى إدخال كود المنتج للبحث';
+            msg.innerText = '⚠️ يرجى إدخال كود المنتج أو اسمه للبحث';
             return;
         }
 
+        searchBtn.disabled = true;
         msg.style.color = '#0284c7';
         msg.innerText = '🔍 جاري البحث في الشيت...';
 
         try {
-            const res = await fetch(`${SCRIPT_URL}?action=search&query=${encodeURIComponent(query)}`);
+            const res = await fetch(SCRIPT_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: 'search', query: query })
+            });
+
             const data = await res.json();
 
             if (data.status === 'success' && data.found) {
@@ -225,7 +227,6 @@
                 document.getElementById('offer').value = toLatin(p.offer);
                 document.getElementById('quantity').value = toLatin(p.quantity);
 
-                // استخراج الوزن والوحدة
                 if (p.size) {
                     const parts = p.size.split(' ');
                     document.getElementById('weightValue').value = toLatin(parts[0] || '');
@@ -237,7 +238,6 @@
                 badge.className = 'status-badge found';
                 badge.innerText = '✅ تم العثور على المنتج في الشيت. يمكنك تعديله الآن:';
                 
-                // إظهار أزرار: تحديث | إلغاء
                 actionBox.innerHTML = `
                     <button class="btn-action btn-update" onclick="submitProduct('update')">🔄 تحديث المنتج في الشيت</button>
                     <button class="btn-action btn-cancel" onclick="resetForm()">❌ إلغاء وتفريغ</button>
@@ -252,8 +252,11 @@
                 msg.innerText = '';
             }
         } catch (e) {
+            console.error(e);
             msg.style.color = '#ef4444';
-            msg.innerText = '❌ تعذر البحث. تأكد من الاتصال بالإنترنت.';
+            msg.innerText = '❌ تعذر إتمام البحث. تحقق من إعدادات النشر كـ (New version).';
+        } finally {
+            searchBtn.disabled = false;
         }
     }
 
@@ -271,7 +274,6 @@
         document.getElementById('message').innerText = '';
     }
 
-    // --- إرسال التحديث أو الحفظ ---
     async function submitProduct(mode) {
         let barcode = toLatin(document.getElementById('barcode').value.trim());
         const name = document.getElementById('name').value.trim();
@@ -328,7 +330,6 @@
         }
     }
 
-    // --- نظام قراءة الباركود بالكاميرا ---
     let loadedImage = new Image(), canvas, ctx;
     let startX, startY, endX, endY, isDrawing = false, imgScale = 1;
 
@@ -390,7 +391,7 @@
             .then(res => {
                 document.getElementById('barcode').value = toLatin(res.text);
                 document.getElementById('cropContainer').style.display = 'none';
-                searchProduct(); // بحث تلقائي فوري بعد القراءة
+                searchProduct();
             })
             .catch(() => {
                 msg.style.color = '#ef4444'; msg.innerText = '❌ لم يتم العثور على باركود، أعد التحديد بدقة';
@@ -403,7 +404,6 @@
         searchProduct();
     }
 
-    // --- نظام رفع الإكسل ---
     let bulkItems = [];
     function handleExcelFile(file) {
         if (!file) return;
