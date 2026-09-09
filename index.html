@@ -112,6 +112,7 @@
     .item-name { font-weight: 600; font-size: 0.88rem; }
     .item-price { font-weight: 700; color: #16a34a; font-size: 0.9rem; }
     .empty-cart { text-align: center; color: #94a3b8; padding-top: 25px; font-size: 0.85rem; }
+    .item-badge { background-color: #0284c7; color: #fff; padding: 2px 7px; border-radius: 6px; font-size: 0.75rem; margin-right: 6px; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -207,7 +208,7 @@
       return String(str || '').replace(/[٠-٩]/g, d => arabicNumbers.indexOf(d)).trim();
     }
 
-    // محلل CSV احترافي يتجاهل الفواصل داخل النصوص وعلامات التنصيص
+    // محلل CSV يتجاوز الفواصل الألمانية وعلامات الاقتباس
     function parseCSVLine(text) {
       let p = '', c = false, r = [];
       for (let i = 0; i < text.length; i++) {
@@ -226,7 +227,7 @@
       return r;
     }
 
-    // تنظيف الأرقام من العملات وتحويل الفاصلة الألمانية لنقطة
+    // تنظيف صيغ الأرقام وتحويل الفواصل لنقاط
     function cleanNumber(val) {
       if (!val) return 0;
       let s = String(val).trim().replace(/[^0-9.,]/g, '');
@@ -249,7 +250,6 @@
           const rawHeaders = parseCSVLine(lines[0]);
           const headers = rawHeaders.map(h => h.trim().toLowerCase());
 
-          // تحديد أماكن الأعمدة بالاسم تلقائياً
           const barcodeIdx = headers.findIndex(h => h.includes('barcode') || h.includes('بار كود'));
           const nameIdx = headers.findIndex(h => h.includes('name') || h.includes('produkt') || h.includes('الاسم'));
           const priceIdx = headers.findIndex(h => h.includes('price') || h.includes('preis') || h.includes('السعر'));
@@ -267,7 +267,6 @@
             const basePrice = priceIdx !== -1 ? cleanNumber(cols[priceIdx]) : 0;
             const offerPrice = offerIdx !== -1 ? cleanNumber(cols[offerIdx]) : 0;
 
-            // اعتماد سعر العرض إذا كان مدخلاً وأكبر من الصفر
             const hasOffer = offerPrice > 0;
             const finalPrice = hasOffer ? offerPrice : basePrice;
 
@@ -313,7 +312,7 @@
       const product = products.find(p => p.barcode === code);
 
       if (product) {
-        cart.unshift(product);
+        cart.push(product);
         showFeedback(`✅ ${product.name} - ${product.price.toFixed(2)} €`, "success");
         renderCart();
       } else {
@@ -368,6 +367,7 @@
       }
     }
 
+    // تجميع المواد المكررة وعرضها بشكل (اسم المادة × العدد)
     function renderCart() {
       if (cart.length === 0) {
         cartList.innerHTML = '<div class="empty-cart">السلة فارغة - ابدأ بالمسح</div>';
@@ -376,15 +376,27 @@
         return;
       }
 
-      let html = "";
+      const grouped = {};
       let sum = 0;
 
       cart.forEach(item => {
         sum += item.price;
+        if (!grouped[item.barcode]) {
+          grouped[item.barcode] = { ...item, count: 0, subtotal: 0 };
+        }
+        grouped[item.barcode].count += 1;
+        grouped[item.barcode].subtotal += item.price;
+      });
+
+      let html = "";
+      Object.values(grouped).forEach(it => {
         html += `
           <div class="cart-item">
-            <span class="item-name">${item.name}</span>
-            <span class="item-price">${item.price.toFixed(2)} €</span>
+            <div>
+              <span class="item-name">${it.name}</span>
+              ${it.count > 1 ? `<span class="item-badge">× ${it.count}</span>` : ''}
+            </div>
+            <span class="item-price">${it.subtotal.toFixed(2)} €</span>
           </div>
         `;
       });
@@ -408,14 +420,20 @@
       invoiceCounter++;
       localStorage.setItem('last_invoice_no', invoiceCounter);
 
+      // التاريخ والوقت الكامل
       const now = new Date();
-      const dateStr = now.toLocaleDateString('ar-EG') + ' ' + now.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const dateStr = `${year}/${month}/${day} - ${hours}:${minutes}`;
 
-      // تجميع الأصناف وتمرير الباركود بدقة لخصم المخزون
+      // تجميع البنود قبل الإرسال مع احتساب عدد التكرار
       const summary = {};
       cart.forEach(item => {
-        if (!summary[item.name]) {
-          summary[item.name] = { 
+        if (!summary[item.barcode]) {
+          summary[item.barcode] = { 
             barcode: item.barcode, 
             name: item.name, 
             count: 0, 
@@ -423,8 +441,8 @@
             total: 0 
           };
         }
-        summary[item.name].count += 1;
-        summary[item.name].total += item.price;
+        summary[item.barcode].count += 1;
+        summary[item.barcode].total += item.price;
       });
 
       const invoicePayload = {
@@ -436,7 +454,7 @@
         items: Object.values(summary)
       };
 
-      // إرسال البيانات لحفظ PDF وخصم الكميات من Google Sheets
+      // إرسال البيانات لتوليد الـ PDF وتحديث المخزون
       fetch(GOOGLE_SCRIPT_URL, {
         method: 'POST',
         mode: 'no-cors',
@@ -444,7 +462,7 @@
         body: JSON.stringify(invoicePayload)
       });
 
-      showFeedback(`🎉 تم دفع #${invoiceCounter} وحُدّث المخزون | الباقي: ${finalChange.toFixed(2)} €`, "success");
+      showFeedback(`🎉 تم دفع #${invoiceCounter} وحُفظت الفاتورة | الباقي: ${finalChange.toFixed(2)} €`, "success");
       cart = [];
       receivedCash = 0;
       renderCart();
